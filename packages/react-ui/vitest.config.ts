@@ -17,6 +17,17 @@ const config: ViteUserConfig = defineConfig({
       },
       {
         resolve: { conditions: ["source", ...defaultClientConditions] },
+        // Pre-bundled up front so Vite does not re-optimise (and reload React) mid-run.
+        optimizeDeps: {
+          include: [
+            "react",
+            "react/jsx-dev-runtime",
+            "react-dom",
+            "react-dom/client",
+            "vitest-browser-react",
+            "@elicitor/capture > modern-screenshot",
+          ],
+        },
         test: {
           name: "browser",
           include: ["src/**/*.browser.test.ts", "src/**/*.browser.test.tsx"],

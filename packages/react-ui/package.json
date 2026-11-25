@@ -13,7 +13,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./styles.css": "./dist/styles.css",
+    "./styles.css": {
+      "source": "./src/styles.css",
+      "default": "./dist/styles.css"
+    },
     "./package.json": "./package.json"
   },
   "types": "./dist/index.d.ts",
