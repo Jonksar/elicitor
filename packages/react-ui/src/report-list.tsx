@@ -45,6 +45,8 @@ export interface ReportListProps {
   readonly renderError?: RenderError;
   /** Marks this row as the current one. */
   readonly selectedId?: string | null;
+  /** Set to false when the host page already has its own heading; the list keeps an accessible name. */
+  readonly showTitle?: boolean;
   readonly colorScheme?: ColorScheme;
   readonly className?: string;
 }
@@ -64,6 +66,7 @@ export function ReportList(props: ReportListProps): ReactElement {
     renderRow,
     renderError,
     selectedId = null,
+    showTitle = true,
     colorScheme = "system",
     className,
   } = props;
@@ -136,7 +139,10 @@ export function ReportList(props: ReportListProps): ReactElement {
       );
   } else {
     body = (
-      <ul className="el-list" aria-labelledby={headingId}>
+      <ul
+        className="el-list"
+        {...(showTitle ? { "aria-labelledby": headingId } : { "aria-label": m.t("list") })}
+      >
         {reports.items.map((item) => {
           const unread = isUnread(item);
           const selected = item.id === selectedId;
@@ -204,10 +210,15 @@ export function ReportList(props: ReportListProps): ReactElement {
   }
 
   return (
-    <section {...rootProps(colorScheme, className, "el-standalone")} aria-labelledby={headingId}>
-      <h2 id={headingId} className="el-section-title">
-        {m.t("list")}
-      </h2>
+    <section
+      {...rootProps(colorScheme, className, "el-standalone")}
+      {...(showTitle ? { "aria-labelledby": headingId } : { "aria-label": m.t("list") })}
+    >
+      {showTitle && (
+        <h2 id={headingId} className="el-section-title">
+          {m.t("list")}
+        </h2>
+      )}
       {reports.status === "error" &&
         reports.items.length > 0 &&
         loadError(() => <Notice kind="error">{m.t("loadFailed")}</Notice>)}

@@ -163,6 +163,19 @@ describe("thread states", () => {
     await expect.element(log.getByText("Assistent", { exact: true })).toBeVisible();
   });
 
+  it("drops its heading but keeps an accessible name when the host has its own", async () => {
+    const transport = createMemoryTransport();
+    await createReport(transport, "Wrong total");
+    await render(
+      <TestProvider transport={transport} locale="en">
+        <ReportList showTitle={false} />
+      </TestProvider>,
+    );
+    await expect.element(page.getByText("Wrong total")).toBeVisible();
+    expect(document.querySelector(".el-section-title")).toBeNull();
+    expect(document.querySelector("ul.el-list")?.getAttribute("aria-label")).toBeTruthy();
+  });
+
   it("lists reports with a status label and date, and an empty state", async () => {
     const transport = createMemoryTransport();
     const first = await render(

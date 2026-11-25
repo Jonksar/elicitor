@@ -74,7 +74,9 @@ pending and `report.canConfirm`; the "correct it" button only with `onCorrect` a
 `report.canReply`. There is no field editing: a correction is a reply in the thread, and the
 assistant answers it with a new summary. Only the latest summary can be confirmed.
 
-### `<ReportList onSelect? getHref? renderRow? renderError? selectedId? colorScheme? className? />`
+### `<ReportList onSelect? getHref? renderRow? renderError? selectedId? showTitle? colorScheme? className? />`
+
+`showTitle={false}` drops the built-in heading when the host page has its own; the list keeps an accessible name.
 
 The reporter's own reports, newest first: status label, unread marker, title (or the first
 sentence), number and date. Loads on mount. A row opened from the list stops showing as unread.
