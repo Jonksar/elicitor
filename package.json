@@ -33,7 +33,10 @@
       "name": "@elicitor/capture",
       "path": "packages/capture/dist/index.js",
       "import": "*",
-      "limit": "10 kB"
+      "ignore": [
+        "modern-screenshot"
+      ],
+      "limit": "6 kB"
     }
   ],
   "devDependencies": {
