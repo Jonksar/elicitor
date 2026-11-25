@@ -224,6 +224,18 @@ describe("constructed client", () => {
     expect(calls[0]?.headers.get("authorization")).toBe("Bearer sk-test");
   });
 
+  test("never sends ANTHROPIC_API_KEY to a gateway", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "env-test-key");
+    const { fetch, calls } = fakeFetch();
+    vi.stubGlobal("fetch", fetch);
+    await anthropicModel({ baseURL: GATEWAY, maxRetries: 0 }).complete(request());
+    expect(calls[0]?.url).toBe(`${GATEWAY}/v1/messages`);
+    expect(calls[0]?.headers.get("authorization")).toBe("Bearer gateway-auth-by-headers");
+    expect(calls[0]?.headers.get("x-api-key")).toBeNull();
+    const values = [...(calls[0]?.headers.values() ?? [])];
+    expect(values.join("\n")).not.toContain("env-test-key");
+  });
+
   test("falls back to ANTHROPIC_API_KEY", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "env-test-key");
     const { fetch, calls } = fakeFetch();

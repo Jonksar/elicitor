@@ -41,6 +41,18 @@ describe("buildSystemPrompt", () => {
     );
   });
 
+  test("takes the glossary heading from the options", () => {
+    const prompt = buildSystemPrompt({
+      ...product,
+      screenGlossary: { "/orders": "Orders — open orders." },
+      glossaryHeading: "Screens (route: local name — English meaning):",
+    });
+    expect(prompt).toContain(
+      "\n\nScreens (route: local name — English meaning):\n- /orders: Orders — open orders.\n\n",
+    );
+    expect(prompt).not.toContain("Short screen glossary");
+  });
+
   test("states the question limit and lets callers add rules", () => {
     expect(buildSystemPrompt(product)).toContain("Ask at most 4 questions in total.");
     const prompt = buildSystemPrompt({

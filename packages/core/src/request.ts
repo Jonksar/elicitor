@@ -96,7 +96,8 @@ export interface RunTurnOptions extends ModelRequestOptions {
 /**
  * One intake turn: calls the model and parses its reply. Throws IntakeUnavailable when the model
  * gives no usable turn, including a question after the limit (that would keep the report in intake
- * forever). Any error the adapter throws other than IntakeUnavailable becomes "gateway".
+ * forever). Any error the adapter throws other than IntakeUnavailable becomes "gateway". Once
+ * `signal` is aborted, the signal's reason is thrown instead.
  */
 export const runTurn = async (options: RunTurnOptions): Promise<Turn> => {
   const request = buildModelRequest(options.input, options);
@@ -106,6 +107,7 @@ export const runTurn = async (options: RunTurnOptions): Promise<Turn> => {
       options.signal ? { ...request, signal: options.signal } : request,
     );
   } catch (error) {
+    if (options.signal?.aborted) throw options.signal.reason;
     if (isIntakeUnavailable(error)) throw error;
     throw new IntakeUnavailable("gateway", { cause: error });
   }

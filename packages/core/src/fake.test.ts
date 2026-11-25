@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { IntakeUnavailable } from "./errors.ts";
 import { createFakeModel, unavailableModel } from "./fake.ts";
 import { buildModelRequest, runTurn } from "./request.ts";
+import { parseTurn } from "./turn.ts";
 import type { HistoryEntry, ModelRequest, TurnInput } from "./types.ts";
 
 const SYSTEM = "system prompt";
@@ -149,6 +150,47 @@ describe("createFakeModel with a script", () => {
     await expect(model.complete(request)).rejects.toThrow("exhausted");
     expect(seen).toEqual([request]);
     expect(model.requests).toHaveLength(5);
+  });
+});
+
+describe("createFakeModel with options", () => {
+  const first = () =>
+    buildModelRequest(turnInput("en", [{ author: "reporter", body: "Sentence", kind: null }]), {
+      system: SYSTEM,
+    });
+  const answered = () =>
+    buildModelRequest(
+      turnInput("en", [
+        { author: "reporter", body: "Sentence", kind: null },
+        { author: "agent", body: "What should be shown there instead?", kind: "question" },
+        { author: "reporter", body: "Two", kind: null },
+      ]),
+      { system: SYSTEM },
+    );
+
+  test("takes the script as an option", async () => {
+    const model = createFakeModel({ script: ["raw text"] });
+    expect(await model.complete(first())).toBe("raw text");
+    await expect(model.complete(first())).rejects.toThrow("exhausted");
+    expect(model.requests).toHaveLength(2);
+  });
+
+  test("uses the given public summary in the built-in agent's summaries", async () => {
+    const model = createFakeModel({ publicSummary: "Someone reported a problem." });
+    const turn = parseTurn(await model.complete(answered()));
+    expect(turn).toMatchObject({
+      kind: "summary",
+      summary: { publicSummary: "Someone reported a problem." },
+    });
+  });
+
+  test("keeps nothing per call with record: false", async () => {
+    const model = createFakeModel({ record: false });
+    for (let index = 0; index < 3; index++) await model.complete(first());
+    expect(model.requests).toHaveLength(0);
+    const scripted = createFakeModel({ script: ["a"], record: false });
+    await scripted.complete(first());
+    expect(scripted.requests).toHaveLength(0);
   });
 });
 

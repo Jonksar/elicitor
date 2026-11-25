@@ -24,14 +24,18 @@ const intake = createIntake({
 
 - `createIntake(options)`: `start`, `reply`, `advance`, `confirm`, `withdraw`. Options: `model`,
   `store`, `prompt` (a string or `SystemPromptOptions`), `maxQuestions` (default 4),
-  `languages`, `defaultLanguage`, `unavailableNotes`, `onUnavailable`.
-- Prompt: `buildSystemPrompt`, `DEFAULT_REPRODUCIBLE_WHEN`, `DEFAULT_PUBLIC_SUMMARY_RULES`.
+  `languages`, `defaultLanguage`, `unavailableNotes`, `onUnavailable`. `start`, `reply` and
+  `advance` take `{ signal }` last; an aborted signal rejects without committing anything or
+  running the fallback. `start` needs `store.create`; hosts that create rows themselves call
+  `advance`.
+- Prompt: `buildSystemPrompt`, `DEFAULT_GLOSSARY_HEADING`, `DEFAULT_REPRODUCIBLE_WHEN`,
+  `DEFAULT_PUBLIC_SUMMARY_RULES`.
 - One turn, stateless: `buildModelRequest`, `runTurn`, `parseTurn`, `isTurn`, `isSummary`,
   `countQuestions`, `resolveLanguage`, `TURN_JSON_SCHEMA`, `MAX_QUESTIONS`, `MAX_CONTEXT_CHARS`
   (20 000), `MAX_REGION_TEXT_ENTRIES` (200), `DEFAULT_LANGUAGES`, `DEFAULT_LANGUAGE`,
   `DEFAULT_UNAVAILABLE_NOTES`, `QUESTION_LIMIT_NOTE`, `REPORTER_WROTE`.
-- Testing and development: `createFakeModel`, `unavailableModel`, `createMemoryStore`,
-  `pendingSummaryOf`.
+- Testing and development: `createFakeModel` (a script, or `{ script?, publicSummary?, record? }`),
+  `unavailableModel`, `createMemoryStore`, `pendingSummaryOf`.
 - Errors: `IntakeUnavailable` / `isIntakeUnavailable` (the model gave no usable turn; core then
   submits the report as written) and `ElicitorError` / `isElicitorError` (`not_found`, `invalid`,
   `stale`). The `is*` guards work across duplicate copies of the package.

@@ -4,12 +4,19 @@ export {
   isElicitorError,
   isIntakeUnavailable,
 } from "./errors.ts";
-export { createFakeModel, type FakeModel, type FakeStep, unavailableModel } from "./fake.ts";
+export {
+  createFakeModel,
+  type FakeModel,
+  type FakeModelOptions,
+  type FakeStep,
+  unavailableModel,
+} from "./fake.ts";
 export {
   createIntake,
   DEFAULT_UNAVAILABLE_NOTES,
   type Intake,
   type IntakeOptions,
+  type TurnCallOptions,
   type UnavailableInfo,
 } from "./intake.ts";
 export {
@@ -20,6 +27,7 @@ export {
 } from "./memory-store.ts";
 export {
   buildSystemPrompt,
+  DEFAULT_GLOSSARY_HEADING,
   DEFAULT_PUBLIC_SUMMARY_RULES,
   DEFAULT_REPRODUCIBLE_WHEN,
   type SystemPromptOptions,

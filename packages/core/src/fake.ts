@@ -10,8 +10,20 @@ export type FakeStep =
   | ((request: ModelRequest) => Turn | string | Promise<Turn | string>);
 
 export interface FakeModel extends ModelAdapter {
-  /** Every request received, oldest first. */
+  /** Every request received, oldest first. Stays empty with `record: false`. */
   readonly requests: ReadonlyArray<ModelRequest>;
+}
+
+export interface FakeModelOptions {
+  /** Scripted replies, one per call. Without it the fake is the built-in scripted agent. */
+  readonly script?: ReadonlyArray<FakeStep>;
+  /** The publicSummary of the built-in agent's summaries. Default: a generic sentence. */
+  readonly publicSummary?: string;
+  /**
+   * Keep every request in `requests`. Default true. Pass false for a long-lived fake (a
+   * development server): the built-in agent is stateless, so it then holds no memory per call.
+   */
+  readonly record?: boolean;
 }
 
 const SCRIPTED: Readonly<
@@ -54,7 +66,7 @@ const QUESTIONS = new Set(Object.values(SCRIPTED).map((text) => text.question));
  * - answer: the latest user message other than the question-limit note.
  * It asks one question, then summarises the first sentence and the latest answer.
  */
-const scriptedTurn = (request: ModelRequest): Turn => {
+const scriptedTurn = (request: ModelRequest, publicSummary: string): Turn => {
   const first = request.messages[0]?.content ?? "";
   const name = /^Reporter's language: (.*)\.$/m.exec(first)?.[1];
   const language =
@@ -80,7 +92,7 @@ const scriptedTurn = (request: ModelRequest): Turn => {
       expected: answer,
       actual: sentence,
       steps: [],
-      publicSummary: FAKE_PUBLIC_SUMMARY,
+      publicSummary,
     },
   };
 };
@@ -90,16 +102,25 @@ const scriptedTurn = (request: ModelRequest): Turn => {
  *
  * With no script it is a scripted agent: one question, then a summary, in English, Estonian,
  * Finnish or Russian. With a script, each call consumes the next step; a call after the last step
- * throws. Either way `requests` records what it received.
+ * throws. `requests` records what it received unless `record` is false. Pass the script as the
+ * argument itself or as `{ script }`.
  */
-export const createFakeModel = (script?: ReadonlyArray<FakeStep>): FakeModel => {
+export const createFakeModel = (
+  options?: ReadonlyArray<FakeStep> | FakeModelOptions,
+): FakeModel => {
+  const settings: FakeModelOptions = Array.isArray(options)
+    ? { script: options }
+    : ((options as FakeModelOptions | undefined) ?? {});
+  const { script } = settings;
+  const publicSummary = settings.publicSummary ?? FAKE_PUBLIC_SUMMARY;
+  const record = settings.record ?? true;
   const requests: Array<ModelRequest> = [];
   let next = 0;
   return {
     requests,
     async complete(request) {
-      requests.push(request);
-      if (!script) return JSON.stringify(scriptedTurn(request));
+      if (record) requests.push(request);
+      if (!script) return JSON.stringify(scriptedTurn(request, publicSummary));
       if (next >= script.length) throw new Error("Fake model script is exhausted");
       const step = script[next++]!;
       if (step instanceof Error) throw step;

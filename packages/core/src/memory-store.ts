@@ -31,11 +31,18 @@ export interface MemoryStoreOptions {
 }
 
 export interface MemoryStore extends ReportStore {
+  create(input: NewReport): Promise<{ readonly id: string; readonly seq: number }>;
   /** Newest first. `filter` sees the metadata the report was created with. */
   list(filter?: (metadata: Readonly<Record<string, unknown>>) => boolean): Array<ReportListItem>;
   toListItem(id: string): ReportListItem | null;
-  /** The wire detail. `canAct` is the host's decision that the viewer owns the report. */
-  toDetail(id: string, options: { readonly canAct: boolean }): ReportDetail | null;
+  /**
+   * The wire detail. `canAct` is the host's decision that the viewer owns the report;
+   * `viewerIsReporter` (default: `canAct`) whether the viewer filed it.
+   */
+  toDetail(
+    id: string,
+    options: { readonly canAct: boolean; readonly viewerIsReporter?: boolean },
+  ): ReportDetail | null;
   /** The reporter has seen the report as it is now; clears `unread`. */
   markSeen(id: string): void;
   /** Moves a report to any status, for hosts that run the fixer side. */
@@ -185,7 +192,7 @@ export const createMemoryStore = (options: MemoryStoreOptions = {}): MemoryStore
       return row ? listItem(row) : null;
     },
 
-    toDetail(id, { canAct }) {
+    toDetail(id, { canAct, viewerIsReporter = canAct }) {
       const row = rows.get(id);
       if (!row) return null;
       const { report } = row;
@@ -208,6 +215,7 @@ export const createMemoryStore = (options: MemoryStoreOptions = {}): MemoryStore
         canReply: canAct && report.status === "intake",
         canConfirm: canAct && pending !== null,
         canWithdraw: canAct && open,
+        viewerIsReporter,
       });
     },
 

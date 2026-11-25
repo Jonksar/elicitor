@@ -468,6 +468,71 @@ describe("createIntake", () => {
     );
   });
 
+  test("start needs a store with create; advance does not", async () => {
+    const { create: _create, ...rest } = createMemoryStore();
+    const intake = createIntake({ model: createFakeModel(), store: rest, prompt: PROMPT });
+    await expect(intake.start(report())).rejects.toBeInstanceOf(TypeError);
+    await expect(intake.start(report())).rejects.toThrow("advance");
+  });
+
+  test("passes the signal to the model", async () => {
+    const model = createFakeModel();
+    const { intake } = setup(model);
+    const controller = new AbortController();
+    const { id } = await intake.start(report(), { signal: controller.signal });
+    await intake.reply(id, "4 200.00", { signal: controller.signal });
+    expect(model.requests.map((request) => request.signal)).toEqual([
+      controller.signal,
+      controller.signal,
+    ]);
+  });
+
+  test("an aborted reply rethrows the abort, keeps the reply and runs no fallback", async () => {
+    const controller = new AbortController();
+    // The adapter turns the aborted request into IntakeUnavailable("gateway"), as real ones do.
+    const { step, control } = deferredStep(new IntakeUnavailable("gateway"));
+    const { store, intake, onUnavailable } = setup(
+      holdingModel((request) => (request.messages.length > 1 ? step : null)),
+    );
+    const { id } = await intake.start(report());
+    const replying = intake.reply(id, "4 200.00", { signal: controller.signal });
+    await control.began;
+    const reason = new Error("request interrupted");
+    controller.abort(reason);
+    control.release();
+    await expect(replying).rejects.toBe(reason);
+    const current = detail(store, id);
+    expect(current.status).toBe("intake");
+    expect(current.messages.at(-1)).toMatchObject({ author: "reporter", body: "4 200.00" });
+    expect(current.messages.some((message) => message.author === "system")).toBe(false);
+    expect(onUnavailable).not.toHaveBeenCalled();
+  });
+
+  test("an abort after the model answered commits nothing", async () => {
+    const controller = new AbortController();
+    const { step, control } = deferredStep({ kind: "question", text: "Which month?" });
+    const { store, intake } = setup(createFakeModel([step]));
+    const { id, seq } = await store.create(report());
+    const advancing = intake.advance(id, seq, report(), { signal: controller.signal });
+    await control.began;
+    controller.abort();
+    control.release();
+    await expect(advancing).rejects.toMatchObject({ name: "AbortError" });
+    expect(detail(store, id).messages).toHaveLength(1);
+    expect(detail(store, id).status).toBe("intake");
+  });
+
+  test("an already aborted signal calls no model", async () => {
+    const model = createFakeModel();
+    const { store, intake } = setup(model);
+    const { id } = await intake.start(report(), { signal: AbortSignal.abort() }).then(
+      () => ({ id: "" }),
+      () => ({ id: store.list()[0]!.id }),
+    );
+    expect(model.requests).toHaveLength(0);
+    expect(detail(store, id)).toMatchObject({ status: "intake", messages: [{ seq: 1 }] });
+  });
+
   test("a throwing onUnavailable hook does not keep the report in intake", async () => {
     const { store, intake } = setup(unavailableModel(), {
       onUnavailable: () => {

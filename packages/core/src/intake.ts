@@ -41,16 +41,31 @@ export interface IntakeOptions {
   readonly onUnavailable?: (info: UnavailableInfo) => void;
 }
 
+/**
+ * Per-call options of the methods that run an agent turn. Aborting `signal` aborts the model call
+ * and rejects with the signal's reason: nothing is committed, so the report stays in intake (a
+ * reply already saved stays saved) and the submit-as-written fallback does not run.
+ */
+export interface TurnCallOptions {
+  readonly signal?: AbortSignal;
+}
+
 export interface Intake {
-  /** Creates the report and runs the first agent turn. */
-  start(input: NewReport): Promise<{ readonly id: string }>;
+  /** Creates the report through `store.create` and runs the first agent turn. */
+  start(input: NewReport, options?: TurnCallOptions): Promise<{ readonly id: string }>;
   /** Saves the reporter's answer or correction and runs the next agent turn. */
-  reply(id: string, body: string): Promise<void>;
+  reply(id: string, body: string, options?: TurnCallOptions): Promise<void>;
   /**
    * Runs the agent turn that answers message `expectedSeq`, for hosts that create rows
-   * themselves. The answer is dropped if the report moved on meanwhile.
+   * themselves (their store needs no `create`). The answer is dropped if the report moved on
+   * meanwhile.
    */
-  advance(id: string, expectedSeq: number, capture: Capture): Promise<void>;
+  advance(
+    id: string,
+    expectedSeq: number,
+    capture: Capture,
+    options?: TurnCallOptions,
+  ): Promise<void>;
   /** Accepts the pending summary whose message seq is `expectedSeq`. */
   confirm(id: string, expectedSeq: number): Promise<void>;
   withdraw(id: string): Promise<void>;
@@ -75,7 +90,14 @@ export const createIntake = (options: IntakeOptions): Intake => {
   const noteFor = (language: string): string =>
     notes[resolveLanguage(language, notes, defaultLanguage)] ?? DEFAULT_UNAVAILABLE_NOTES.en!;
 
-  const advance = async (id: string, expectedSeq: number, capture: Capture): Promise<void> => {
+  const advance = async (
+    id: string,
+    expectedSeq: number,
+    capture: Capture,
+    callOptions: TurnCallOptions = {},
+  ): Promise<void> => {
+    const { signal } = callOptions;
+    signal?.throwIfAborted();
     const report = await store.get(id);
     if (!report) throw new ElicitorError("not_found");
     const history = report.messages.flatMap(
@@ -99,9 +121,12 @@ export const createIntake = (options: IntakeOptions): Intake => {
         maxQuestions,
         defaultLanguage,
         ...(options.languages ? { languages: options.languages } : {}),
+        ...(signal ? { signal } : {}),
       });
       outcome = { kind: "turn", turn };
     } catch (error) {
+      // The caller gave up: not the assistant's failure, so no fallback and nothing committed.
+      if (signal?.aborted) throw signal.reason;
       if (!isIntakeUnavailable(error)) throw error;
       try {
         options.onUnavailable?.({
@@ -114,25 +139,35 @@ export const createIntake = (options: IntakeOptions): Intake => {
       }
       outcome = { kind: "unavailable", note: noteFor(capture.language), reason: error.reason };
     }
+    signal?.throwIfAborted();
     // false: the report was withdrawn or the reporter wrote again meanwhile; drop the late turn.
     await store.commitTurn(id, expectedSeq, outcome);
   };
 
   return {
-    async start(input) {
+    async start(input, callOptions) {
+      if (!store.create)
+        throw new TypeError(
+          "intake.start() needs a store with create(); hosts that create rows themselves call intake.advance()",
+        );
       if (!input.sentence.trim()) throw new ElicitorError("invalid", "The sentence is empty");
       const { id, seq } = await store.create(input);
-      await advance(id, seq, {
-        language: input.language,
-        route: input.route,
-        regionText: input.regionText,
-        context: input.context,
-        screenshotPng: input.screenshotPng,
-      });
+      await advance(
+        id,
+        seq,
+        {
+          language: input.language,
+          route: input.route,
+          regionText: input.regionText,
+          context: input.context,
+          screenshotPng: input.screenshotPng,
+        },
+        callOptions,
+      );
       return { id };
     },
 
-    async reply(id, body) {
+    async reply(id, body, callOptions) {
       const text = body.trim();
       if (!text) throw new ElicitorError("invalid", "The reply is empty");
       const appended = await store.appendReporterMessage(id, text);
@@ -143,7 +178,7 @@ export const createIntake = (options: IntakeOptions): Intake => {
       // Errors from here on leave the reply saved; they pass through unchanged.
       const capture = await store.loadCapture(id);
       if (!capture) throw new ElicitorError("not_found");
-      await advance(id, appended.seq, capture);
+      await advance(id, appended.seq, capture, callOptions);
     },
 
     advance,

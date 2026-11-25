@@ -177,8 +177,11 @@ export type TurnOutcome =
  * so the host can report "unavailable" without the fallback path running.
  */
 export interface ReportStore {
-  /** Creates the report in status "intake" with the sentence as message seq 1. */
-  create(input: NewReport): Promise<{ readonly id: string; readonly seq: number }>;
+  /**
+   * Creates the report in status "intake" with the sentence as message seq 1. Needed by
+   * `intake.start()` only: hosts that create rows themselves omit it and call `intake.advance()`.
+   */
+  create?(input: NewReport): Promise<{ readonly id: string; readonly seq: number }>;
   get(id: string): Promise<StoredReport | null>;
   /** The capture saved at creation; null when the report does not exist. */
   loadCapture(id: string): Promise<Capture | null>;
@@ -242,6 +245,11 @@ export interface ReportDetail extends ReportListItem {
   readonly canReply: boolean;
   readonly canConfirm: boolean;
   readonly canWithdraw: boolean;
+  /**
+   * Decided by the host: the viewer is the person who filed the report. The UI labels the
+   * reporter's messages "You" when true and "Reporter" otherwise.
+   */
+  readonly viewerIsReporter: boolean;
 }
 
 export interface CreateReportInput {

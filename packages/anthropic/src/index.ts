@@ -4,12 +4,17 @@ import { IntakeUnavailable, type ModelAdapter, type ModelRequest } from "@elicit
 export interface AnthropicModelOptions {
   /** A ready client. When given, apiKey, baseURL, defaultHeaders, timeoutMs and maxRetries are unused. */
   readonly client?: Anthropic;
-  /** Defaults to the ANTHROPIC_API_KEY environment variable. */
+  /**
+   * Without `baseURL`, defaults to the ANTHROPIC_API_KEY environment variable. With `baseURL` the
+   * environment is never read: only a key passed here is sent to the gateway.
+   */
   readonly apiKey?: string;
   /**
-   * A gateway or proxy in front of the Messages API. A gateway that authenticates by headers needs
-   * no apiKey: a placeholder key is then sent so the SDK constructs (as `Authorization: Bearer
-   * gateway-auth-by-headers`; an Authorization header in defaultHeaders replaces it).
+   * A gateway or proxy in front of the Messages API. ANTHROPIC_API_KEY is then not used, so a real
+   * key never reaches a gateway by accident. A gateway that authenticates by headers needs no
+   * apiKey: a placeholder key is sent so the SDK constructs (as `Authorization: Bearer
+   * gateway-auth-by-headers`; an Authorization header in defaultHeaders replaces it). Pass `apiKey`
+   * when the gateway expects a specific value there.
    */
   readonly baseURL?: string;
   /** Sent with every request, for example a gateway's own auth header. */
@@ -64,7 +69,8 @@ const toMessages = (request: ModelRequest): Array<Anthropic.MessageParam> => {
 /**
  * A ModelAdapter over the Anthropic Messages API: structured JSON output, adaptive thinking and a
  * cached system prompt. The client is built on the first call; with no client, apiKey, baseURL or
- * ANTHROPIC_API_KEY, complete() throws IntakeUnavailable("not_configured") without a request.
+ * ANTHROPIC_API_KEY, complete() throws IntakeUnavailable("not_configured") without a request. The
+ * environment's key is used only without baseURL.
  */
 export const anthropicModel = (options: AnthropicModelOptions = {}): ModelAdapter => {
   const model = options.model ?? "claude-opus-5-5";
@@ -75,8 +81,7 @@ export const anthropicModel = (options: AnthropicModelOptions = {}): ModelAdapte
 
   const clientFor = (): Anthropic => {
     if (client) return client;
-    const apiKey =
-      options.apiKey || envApiKey() || (options.baseURL ? GATEWAY_PLACEHOLDER_KEY : undefined);
+    const apiKey = options.apiKey || (options.baseURL ? GATEWAY_PLACEHOLDER_KEY : envApiKey());
     if (!apiKey) throw new IntakeUnavailable("not_configured");
     client = new Anthropic({
       apiKey,

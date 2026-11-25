@@ -186,11 +186,18 @@ describe("createMemoryStore", () => {
       canReply: true,
       canConfirm: true,
       canWithdraw: true,
+      viewerIsReporter: true,
     });
     expect(store.toDetail(id, { canAct: false })).toMatchObject({
       canReply: false,
       canConfirm: false,
       canWithdraw: false,
+      viewerIsReporter: false,
+    });
+    // An operator may act without having filed the report.
+    expect(store.toDetail(id, { canAct: true, viewerIsReporter: false })).toMatchObject({
+      canReply: true,
+      viewerIsReporter: false,
     });
     store.markSeen(id);
     expect(store.toListItem(id)?.unread).toBe(false);

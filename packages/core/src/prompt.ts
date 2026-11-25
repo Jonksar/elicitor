@@ -13,6 +13,11 @@ export interface SystemPromptOptions {
   readonly audience?: string;
   /** Route to screen label, emitted in insertion order as `- ${route}: ${label}`. */
   readonly screenGlossary?: Readonly<Record<string, string>>;
+  /**
+   * The line above the glossary entries, colon included. Default
+   * "Short screen glossary (route: label):". Use it when the labels follow another pattern.
+   */
+  readonly glossaryHeading?: string;
   /** The bullets after "A report is reproducible when it says:". */
   readonly reproducibleWhen?: ReadonlyArray<string>;
   /** Extra bullets appended to the "How to talk" rules. */
@@ -31,6 +36,8 @@ export const DEFAULT_REPRODUCIBLE_WHEN: ReadonlyArray<string> = [
 
 export const DEFAULT_PUBLIC_SUMMARY_RULES: string =
   'It must contain no customer data: no amounts or other numbers, no names of companies, people, products, accounts or banks, no dates, no document numbers. Describe the screen and the kind of problem only, for example "The total on the order detail screen does not match the sum of its lines."';
+
+export const DEFAULT_GLOSSARY_HEADING = "Short screen glossary (route: label):";
 
 const bullets = (lines: ReadonlyArray<string>): string =>
   lines.map((line) => `- ${line}`).join("\n");
@@ -54,7 +61,7 @@ export const buildSystemPrompt = (options: SystemPromptOptions): string => {
   const glossary = Object.entries(options.screenGlossary ?? {});
   if (glossary.length > 0)
     sections.push(
-      `Short screen glossary (route: label):\n${glossary.map(([route, label]) => `- ${route}: ${label}`).join("\n")}`,
+      `${options.glossaryHeading ?? DEFAULT_GLOSSARY_HEADING}\n${glossary.map(([route, label]) => `- ${route}: ${label}`).join("\n")}`,
     );
   sections.push(
     `A report is reproducible when it says:\n${bullets(options.reproducibleWhen ?? DEFAULT_REPRODUCIBLE_WHEN)}`,
