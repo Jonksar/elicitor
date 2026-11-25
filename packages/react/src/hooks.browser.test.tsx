@@ -264,6 +264,25 @@ describe("the report flow", () => {
     expect(calls.get.mock.calls.length).toBe(getsBeforeReply);
   });
 
+  it("submit({ openThread: false }) goes back to idle without loading the report", async () => {
+    const transport = createMemoryTransport();
+    const calls = spied(transport);
+    const { result } = await renderWidget(transport);
+    await result.current.elicitor.open();
+    await expect.poll(() => result.current.elicitor.flow.step).toBe("composing");
+    const item = await result.current.elicitor.submit("Wrong", { openThread: false });
+    await expect.poll(() => result.current.elicitor.flow.step).toBe("idle");
+    expect(result.current.elicitor.flow).toEqual({
+      step: "idle",
+      capture: null,
+      reportId: null,
+      error: null,
+    });
+    expect(item.id).toBeTruthy();
+    expect(calls.create).toHaveBeenCalledTimes(1);
+    expect(calls.get).not.toHaveBeenCalled();
+  });
+
   it("goes back to idle when the region select is cancelled", async () => {
     fakes.startRegionSelect.mockImplementationOnce(async () => null);
     const { result } = await renderWidget(createMemoryTransport());
@@ -545,6 +564,25 @@ describe("host data and capture switches", () => {
     expect(fakes.uninstall).toHaveBeenCalledTimes(1);
   });
 
+  it("reads console errors from a host function when the region is chosen, installing nothing", async () => {
+    const hostBuffer: Array<ConsoleErrorEntry> = [CONSOLE_ERROR];
+    const consoleErrors = vi.fn(() => [...hostBuffer]);
+    const transport = createMemoryTransport();
+    const calls = spied(transport);
+    const { result } = await renderWidget(transport, { capture: { consoleErrors } });
+    await result.current.elicitor.open();
+    await expect.poll(() => result.current.elicitor.flow.step).toBe("composing");
+    expect(consoleErrors).toHaveBeenCalledTimes(1);
+    // An error logged while the reporter writes is not part of the marked moment.
+    hostBuffer.push({ at: "2026-01-01T00:00:01.000Z", message: "Later" });
+    await result.current.elicitor.submit("Wrong");
+    expect(consoleErrors).toHaveBeenCalledTimes(1);
+    expect(calls.create.mock.calls[0]?.[0].context.consoleErrors).toEqual([CONSOLE_ERROR]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fakes.createConsoleErrorBuffer).not.toHaveBeenCalled();
+    expect(fakes.install).not.toHaveBeenCalled();
+  });
+
   it("reads the request log from a function or from a RequestLog", async () => {
     const entry: RequestLogEntry = {
       tag: "orders.list",
@@ -628,6 +666,7 @@ describe("useReport", () => {
     expect(result.current.canReply).toBe(false);
     expect(result.current.canConfirm).toBe(false);
     expect(result.current.canWithdraw).toBe(false);
+    expect(result.current.report?.viewerIsReporter).toBe(false);
 
     for (const action of [
       () => result.current.reply("Mine now"),

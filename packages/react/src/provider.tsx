@@ -1,5 +1,6 @@
 import type {
   CaptureContext,
+  ConsoleErrorEntry,
   CreateReportInput,
   ElicitorTransport,
   ReportDetail,
@@ -41,10 +42,13 @@ export interface ElicitorCaptureConfig {
   /** Send navigator.userAgent in the context. Default true. */
   readonly userAgent?: boolean;
   /**
-   * Keep the last 30 console errors and unhandled rejections from mount on. Default true. The
-   * provider loads `@elicitor/capture` after mount to install the buffer, and removes it on unmount.
+   * true (default): keep the last 30 console errors and unhandled rejections from mount on. The
+   * provider loads `@elicitor/capture` after mount to install the buffer, and removes it on
+   * unmount. false: send none. A function: the host keeps its own buffer and returns its entries;
+   * it is called when the context is captured (when the region select ends), and the provider
+   * installs nothing.
    */
-  readonly consoleErrors?: boolean;
+  readonly consoleErrors?: boolean | (() => ReadonlyArray<ConsoleErrorEntry>);
   /** Identifies the deployed build in the context. Default: decided by `@elicitor/capture`. */
   readonly bundleId?: string;
   /** The host's request log, or a function returning its entries at report time. */
@@ -59,8 +63,11 @@ export interface ElicitorProviderProps {
   readonly transport: ElicitorTransport;
   /** Reporter's language code, also sent as the context language. Default "en". Stored as is. */
   readonly locale?: string;
-  /** UI texts by key. Stored and exposed untouched; this package never reads them. */
-  readonly messages?: Readonly<Record<string, string>>;
+  /**
+   * UI texts by key. Stored and exposed untouched; this package never reads them. A full bundle,
+   * a partial one or a plain string record are all accepted.
+   */
+  readonly messages?: MessagesInput;
   readonly capture?: ElicitorCaptureConfig;
   /** The route sent with a report. Default: location.pathname + location.search. */
   readonly getRoute?: () => string;
@@ -72,6 +79,9 @@ export interface ElicitorProviderProps {
   readonly onError?: (error: unknown) => void;
   readonly children?: ReactNode;
 }
+
+/** UI texts by key, as the provider's `messages` prop takes them. Undefined values are ignored. */
+export type MessagesInput = Readonly<Record<string, string | undefined>>;
 
 export type FlowStep = "idle" | "selecting" | "composing" | "submitting" | "thread";
 
@@ -103,6 +113,11 @@ export interface OpenOptions {
   readonly zIndex?: number;
 }
 
+export interface SubmitOptions {
+  /** Move to "thread" with the new report (default true); false goes back to "idle". */
+  readonly openThread?: boolean;
+}
+
 export interface CreateReportOptions {
   readonly sentence: string;
   readonly capture?: CaptureResult | null;
@@ -110,15 +125,15 @@ export interface CreateReportOptions {
 
 export interface ElicitorApi {
   readonly locale: string;
-  readonly messages: Readonly<Record<string, string>>;
+  readonly messages: MessagesInput;
   readonly transport: ElicitorTransport;
   readonly flow: FlowState;
   /** Starts a region select; resolves in "composing", or back in "idle" when cancelled/failed. */
   open(options?: OpenOptions): Promise<void>;
   /** Back to "idle"; aborts a running region select. Ignored while "submitting". */
   close(): void;
-  /** Sends the sentence with the flow's capture; moves to "thread". */
-  submit(sentence: string): Promise<ReportListItem>;
+  /** Sends the sentence with the flow's capture; moves to "thread" (or "idle", see options). */
+  submit(sentence: string, options?: SubmitOptions): Promise<ReportListItem>;
   /** Creates a report without the flow, capturing route, context and metadata now. */
   createReport(input: CreateReportOptions): Promise<ReportListItem>;
   readonly reports: ReportsState;
@@ -177,7 +192,8 @@ export function ElicitorProvider(props: ElicitorProviderProps): ReactElement {
 
   const mounted = useRef(false);
   const buffer = useRef<ConsoleErrorBuffer | null>(null);
-  const consoleErrors = props.capture?.consoleErrors !== false;
+  // Only the default buffer needs installing; a host function brings its own.
+  const consoleErrors = (props.capture?.consoleErrors ?? true) === true;
 
   const [flow, setFlowState] = useState<FlowState>(IDLE_FLOW);
   const flowRef = useRef<FlowState>(IDLE_FLOW);
@@ -270,10 +286,16 @@ export function ElicitorProvider(props: ElicitorProviderProps): ReactElement {
     const capture = await loadCapture();
     const requestLog =
       typeof config.requestLog === "function" ? config.requestLog() : config.requestLog?.entries();
+    const consoleErrors =
+      typeof config.consoleErrors === "function"
+        ? config.consoleErrors()
+        : config.consoleErrors === false
+          ? []
+          : (buffer.current?.entries() ?? []);
     const context = capture.collectContext({
       language: localeRef.current,
       userAgent: config.userAgent !== false,
-      consoleErrors: buffer.current?.entries() ?? [],
+      consoleErrors,
       ...(config.bundleId !== undefined ? { bundleId: config.bundleId } : {}),
       ...(requestLog !== undefined ? { requestLog } : {}),
     });
@@ -354,7 +376,7 @@ export function ElicitorProvider(props: ElicitorProviderProps): ReactElement {
   }, [setFlow]);
 
   const submit = useCallback(
-    async (sentence: string): Promise<ReportListItem> => {
+    async (sentence: string, options: SubmitOptions = {}): Promise<ReportListItem> => {
       const state = flowRef.current;
       if (state.step === "submitting")
         throw new ElicitorActionError("busy", "A report is being sent");
@@ -369,7 +391,11 @@ export function ElicitorProvider(props: ElicitorProviderProps): ReactElement {
         const item = await send(text, state.capture, taken);
         if (mounted.current && flowGen.current === gen) {
           snapshot.current = null;
-          setFlow({ step: "thread", capture: null, reportId: item.id, error: null });
+          setFlow(
+            options.openThread === false
+              ? IDLE_FLOW
+              : { step: "thread", capture: null, reportId: item.id, error: null },
+          );
         }
         return item;
       } catch (error) {

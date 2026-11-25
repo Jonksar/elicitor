@@ -58,6 +58,7 @@ const detail: ReportDetail = {
   canReply: true,
   canConfirm: false,
   canWithdraw: true,
+  viewerIsReporter: true,
 };
 
 const input: CreateReportInput = {

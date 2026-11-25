@@ -38,8 +38,10 @@ export {
   type FlowState,
   type FlowStep,
   type LoadStatus,
+  type MessagesInput,
   type OpenOptions,
   type ReportsState,
+  type SubmitOptions,
   useCapture,
   useElicitor,
 } from "./provider.tsx";

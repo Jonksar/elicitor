@@ -29,7 +29,10 @@ export interface MemoryTransportOptions {
 }
 
 export interface MemoryTransport extends ElicitorTransport {
-  /** Switches between owner (canReply/canConfirm/canWithdraw as the store decides) and viewer. */
+  /**
+   * Switches between owner (canReply/canConfirm/canWithdraw as the store decides, and
+   * viewerIsReporter true) and another viewer.
+   */
   actAs(owner: boolean): void;
   readonly store: MemoryStore;
   readonly intake: Intake;
@@ -71,7 +74,7 @@ export const createMemoryTransport = (options: MemoryTransportOptions = {}): Mem
     }
   };
   const detail = (id: string): ReportDetail => {
-    const value = store.toDetail(id, { canAct: owner });
+    const value = store.toDetail(id, { canAct: owner, viewerIsReporter: owner });
     if (!value) throw new ElicitorTransportError(404, "not_found");
     store.markSeen(id);
     return value;

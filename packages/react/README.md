@@ -43,7 +43,8 @@ From `@elicitor/react`:
   `isElicitorActionError`.
 - Constant: `CONSOLE_ERROR_LIMIT` (`30`).
 - Types: `ElicitorProviderProps`, `ElicitorCaptureConfig`, `ElicitorApi`, `FlowState`, `FlowStep`,
-  `OpenOptions`, `CreateReportOptions`, `ReportsState`, `LoadStatus`, `ReportState`,
+  `OpenOptions`, `SubmitOptions`, `MessagesInput`, `CreateReportOptions`, `ReportsState`,
+  `LoadStatus`, `ReportState`,
   `ReportAction`, `CaptureApi`, `CaptureStartOptions`, `FetchTransportOptions`,
   `ElicitorActionErrorCode`.
 - Types re-exported from `@elicitor/capture`: `CaptureResult`, `RegionSelectLabels`,
@@ -84,7 +85,7 @@ function ElicitorProvider(props: ElicitorProviderProps): ReactElement;
 interface ElicitorProviderProps {
   transport: ElicitorTransport; // required
   locale?: string; // default "en"
-  messages?: Readonly<Record<string, string>>; // default {}
+  messages?: MessagesInput; // Readonly<Record<string, string | undefined>>, default {}
   capture?: ElicitorCaptureConfig;
   getRoute?: () => string; // default location.pathname + location.search
   getMetadata?: () => Readonly<Record<string, unknown>> | undefined;
@@ -98,7 +99,7 @@ interface ElicitorCaptureConfig {
   regionText?: boolean; // default true
   maxRegionText?: number; // passed to the region select as is
   userAgent?: boolean; // default true; false sends ""
-  consoleErrors?: boolean; // default true
+  consoleErrors?: boolean | (() => ReadonlyArray<ConsoleErrorEntry>); // default true
   bundleId?: string; // default decided by @elicitor/capture
   requestLog?: RequestLog | (() => ReadonlyArray<RequestLogEntry>);
   labels?: Partial<RegionSelectLabels>; // { hint, wholeView, cancel } for the overlay
@@ -107,8 +108,9 @@ interface ElicitorCaptureConfig {
 ```
 
 - `locale` and `messages` are stored and exposed through `useElicitor()` without any processing.
-  This package never reads `messages`; react-ui owns the bundles and resolves keys. `locale` is
-  also sent as `CaptureContext.language`, which picks the assistant's language.
+  This package never reads `messages`; react-ui owns the bundles and resolves keys. A full bundle
+  (react-ui's `Messages`), a partial one or a plain string record are all accepted without a cast.
+  `locale` is also sent as `CaptureContext.language`, which picks the assistant's language.
 - `getMetadata()` is sent as `CreateReportInput.metadata`, the same object, unchanged. Use it to
   send host state the backend needs, such as the selected tenant or company. When it returns
   `undefined`, or is not given, the `metadata` key is left out.
@@ -121,7 +123,9 @@ interface ElicitorCaptureConfig {
   `context.consoleErrors`. With the option off, no buffer is created and `consoleErrors` is `[]`.
   This is the one case where `@elicitor/capture` loads before the widget opens. With it off, the
   module loads on the first `open()`, `useCapture().start()` or `createReport()`. It is always
-  loaded with a dynamic `import()`, never in the main bundle.
+  loaded with a dynamic `import()`, never in the main bundle. As a function, the host keeps its own
+  buffer: the provider installs none and calls the function when the context is captured (when
+  the region select finishes, like `requestLog`).
 - `capture.requestLog`: a `RequestLog` from `createRequestLog()` (its `entries()` is read), or a
   function. Both are read when the context is captured. Without it, the request log is left to
   `collectContext`'s default (empty).
@@ -138,12 +142,12 @@ function useElicitor(): ElicitorApi; // throws "useElicitor() must be used insid
 
 interface ElicitorApi {
   locale: string;
-  messages: Readonly<Record<string, string>>;
+  messages: MessagesInput;
   transport: ElicitorTransport;
   flow: FlowState;
   open(options?: OpenOptions): Promise<void>;
   close(): void;
-  submit(sentence: string): Promise<ReportListItem>;
+  submit(sentence: string, options?: SubmitOptions): Promise<ReportListItem>;
   createReport(input: CreateReportOptions): Promise<ReportListItem>;
   reports: ReportsState;
 }
@@ -159,6 +163,9 @@ interface OpenOptions {
   labels?: Partial<RegionSelectLabels>;
   zIndex?: number;
 }
+interface SubmitOptions {
+  openThread?: boolean; // default true; false goes back to "idle" after success
+}
 interface CreateReportOptions {
   sentence: string;
   capture?: CaptureResult | null;
@@ -167,16 +174,16 @@ interface CreateReportOptions {
 
 Flow transitions:
 
-| Call               | From                              | Result                                                                                                                                                                                                                                                                         |
-| ------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `open(options?)`   | `idle`, `composing`, `thread`     | `selecting`. Resolves after the region select ends: `composing` with `flow.capture` set; `idle` when the reporter cancels; `idle` with `flow.error` set (plus `onError`) when capture fails. Does not reject on a capture failure.                                             |
-| `open()`           | `selecting`                       | Nothing happens (resolves at once).                                                                                                                                                                                                                                            |
-| `open()`           | `submitting`                      | Rejects with `ElicitorActionError("busy")`.                                                                                                                                                                                                                                    |
-| `open()`           | while `useCapture().start()` runs | Rejects with `ElicitorActionError("busy")`; the flow is not touched.                                                                                                                                                                                                           |
-| `close()`          | any except `submitting`           | `idle`; clears capture, reportId and error, and aborts a running region select (its late result is ignored).                                                                                                                                                                   |
-| `close()`          | `submitting`                      | Ignored. The sentence dialog cannot be closed while sending.                                                                                                                                                                                                                   |
-| `submit(sentence)` | `composing`                       | Trims the text, goes to `submitting`, calls `transport.create`. On success: `thread`, with `flow.reportId` set and `flow.capture` cleared, and resolves with the item. On failure: back to `composing` with the capture kept and `flow.error` set, and rejects with the error. |
-| `submit()`         | other steps                       | `ElicitorActionError("invalid_step")`, or `"busy"` while already submitting. An empty sentence after trimming gives `"empty"`.                                                                                                                                                 |
+| Call               | From                              | Result                                                                                                                                                                                                                                                                                                                |
+| ------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open(options?)`   | `idle`, `composing`, `thread`     | `selecting`. Resolves after the region select ends: `composing` with `flow.capture` set; `idle` when the reporter cancels; `idle` with `flow.error` set (plus `onError`) when capture fails. Does not reject on a capture failure.                                                                                    |
+| `open()`           | `selecting`                       | Nothing happens (resolves at once).                                                                                                                                                                                                                                                                                   |
+| `open()`           | `submitting`                      | Rejects with `ElicitorActionError("busy")`.                                                                                                                                                                                                                                                                           |
+| `open()`           | while `useCapture().start()` runs | Rejects with `ElicitorActionError("busy")`; the flow is not touched.                                                                                                                                                                                                                                                  |
+| `close()`          | any except `submitting`           | `idle`; clears capture, reportId and error, and aborts a running region select (its late result is ignored).                                                                                                                                                                                                          |
+| `close()`          | `submitting`                      | Ignored. The sentence dialog cannot be closed while sending.                                                                                                                                                                                                                                                          |
+| `submit(sentence)` | `composing`                       | Trims the text, goes to `submitting`, calls `transport.create`. On success: `thread`, with `flow.reportId` set and `flow.capture` cleared (with `{ openThread: false }`: `idle`), and resolves with the item. On failure: back to `composing` with the capture kept and `flow.error` set, and rejects with the error. |
+| `submit()`         | other steps                       | `ElicitorActionError("invalid_step")`, or `"busy"` while already submitting. An empty sentence after trimming gives `"empty"`.                                                                                                                                                                                        |
 
 `open()` merges `options.labels` over `capture.labels` key by key, and `options.zIndex` overrides
 `capture.zIndex`.
@@ -404,8 +411,9 @@ interface MemoryTransport extends ElicitorTransport {
 An in-browser backend built from core's `createIntake`, `createFakeModel` and `createMemoryStore`,
 with no server and no API key. Use it for tests, demos and UI development.
 
-- `actAs(false)` turns the viewer into a non-owner. Details then have `canReply`, `canConfirm` and
-  `canWithdraw` set to `false`, and the transport refuses `reply`, `confirm` and `withdraw` with
+- `actAs(false)` turns the viewer into a non-owner. Details then have `canReply`, `canConfirm`,
+  `canWithdraw` and `viewerIsReporter` set to `false`, and the transport refuses `reply`,
+  `confirm` and `withdraw` with
   `ElicitorTransportError(403, "forbidden")`.
 - Core errors are mapped to the same `ElicitorTransportError` statuses and codes that a REST server
   returns (`not_found` 404, `invalid` 400, `stale` 409), so a UI handles both transports the same
