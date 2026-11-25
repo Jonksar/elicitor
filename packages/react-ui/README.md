@@ -57,7 +57,7 @@ pending and `report.canConfirm`; the "correct it" button only with `onCorrect` a
 `report.canReply`. There is no field editing: a correction is a reply in the thread, and the
 assistant answers it with a new summary. Only the latest summary can be confirmed.
 
-### `<ReportList onSelect? selectedId? />`
+### `<ReportList onSelect? selectedId? colorScheme? className? />`
 
 The reporter's own reports, newest first: status label, unread marker, title (or the first
 sentence), number and date. Loads on mount. A row opened from the list stops showing as unread.

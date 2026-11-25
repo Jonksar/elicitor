@@ -28,8 +28,9 @@ export function App() {
 }
 ```
 
-React 18 and 19 are supported (`peerDependencies: react >=18`). The package has no runtime
-dependencies besides `@elicitor/core` and `@elicitor/capture`.
+`peerDependencies` allow React 18 and later (`react >=18`), and the hooks use only APIs React 18
+has, but the tests run on React 19 only. The package has no runtime dependencies besides
+`@elicitor/core` and `@elicitor/capture`.
 
 ## Exports
 
@@ -323,8 +324,9 @@ interface FetchTransportOptions {
 
 ### The REST shape
 
-The transport speaks this shape. The planned example server and `@elicitor/server` will implement
-exactly this.
+The transport speaks this shape. `examples/vite-react/server.example.ts` and the handler in
+[docs/quick-start.md](../../docs/quick-start.md) implement it; a ready-made `@elicitor/server` is
+planned for 0.2.
 `{base}` is `baseUrl` with trailing slashes removed. `:id` is `ReportListItem.id`, passed through
 `encodeURIComponent`. Every request sends `Accept: application/json`, and requests with a body
 send `Content-Type: application/json`.
