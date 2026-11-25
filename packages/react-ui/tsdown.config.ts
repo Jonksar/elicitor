@@ -1,0 +1,14 @@
+import { defineConfig, type UserConfig } from "tsdown";
+
+const config: UserConfig = defineConfig({
+  entry: ["src/index.ts"],
+  format: "esm",
+  platform: "browser",
+  target: "es2022",
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  copy: [{ from: "src/styles.css", to: "dist" }],
+});
+
+export default config;
