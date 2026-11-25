@@ -29,10 +29,5 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: Build examples
-        run: |
-          if ls examples/*/package.json >/dev/null 2>&1; then
-            pnpm -r --filter "./examples/**" build
-          else
-            echo "No examples yet"
-          fi
+        run: pnpm -r --filter "./examples/**" build
       - run: pnpm size
