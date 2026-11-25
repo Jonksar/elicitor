@@ -9,7 +9,8 @@ configured, and from your server to the model provider you configured.
 - **Console errors** are the one thing recorded before the widget opens. With
   `capture.consoleErrors` on (the default), `<ElicitorProvider>` installs a buffer after mount that
   keeps the latest 30 `console.error` calls, window `error` events and `unhandledrejection` reasons
-  in memory. Nothing leaves the page until a report is created.
+  in memory. Nothing leaves the page until a report is created. With a function instead, your own
+  buffer is read when the region select finishes and the provider installs nothing.
 - **Route, context and metadata** are read when the region select finishes, before the reporter
   types the sentence (`createReport()` reads them when it is called).
 - **Screenshot and region text** are taken when the reporter has chosen a region or the whole view,
@@ -61,9 +62,12 @@ The `capture` option is read each time a capture starts, so it can differ per ro
 ## Keeping parts of the page out
 
 Any element with the `data-elicitor-ui` attribute, and everything inside it, is left out of both
-the screenshot and the region text. The widget sets it on its own roots and the overlay sets it on
-itself. A trigger you render yourself (`trigger={(api) => ...}` or your own menu item) is not
-marked; add the attribute if it should stay out of the picture. Use it on your own sensitive UI:
+the screenshot and the region text. The `<Elicitor />` widget sets it on its own roots (trigger,
+dialogs, thread panel) and the overlay sets it on itself. `ReportList`, `ReportThread` and
+`SummaryConfirm` rendered by your own page are not marked: a report filed from that page captures
+them like the rest of it. A trigger you render yourself (`trigger={(api) => ...}` or your own menu
+item) is not marked either; add the attribute if it should stay out of the picture. Use it on your
+own sensitive UI:
 
 ```html
 <section data-elicitor-ui>

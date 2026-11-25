@@ -3,8 +3,9 @@
 The ready-made Elicitor widget for React: a floating "Report a problem" button, the region select,
 a one-sentence dialog and a thread panel where the assistant asks its follow-up questions and reads
 back a summary for the reporter to confirm. Plain React and one CSS file; no UI library, no
-CSS-in-JS. Built on the headless [`@elicitor/react`](../react/README.md), whose provider and hooks
-are re-exported here.
+CSS-in-JS. Built on the headless [`@elicitor/react`](../react/README.md); everything it exports
+(provider, hooks, `createFetchTransport`, `ElicitorTransportError` and the other errors, the wire
+types a custom transport needs) is re-exported here, so a host imports from this package only.
 
 ```tsx
 import "@elicitor/react-ui/styles.css";
@@ -29,12 +30,14 @@ in-browser fake model (`createMemoryTransport` from `@elicitor/react/testing`).
 
 ### `<Elicitor />`
 
-| Prop          | Type                                                                         | Default          |
-| ------------- | ---------------------------------------------------------------------------- | ---------------- |
-| `trigger`     | `ReactNode \| ((api: { open(): void; busy: boolean }) => ReactNode) \| null` | floating button  |
-| `position`    | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"`               | `"bottom-right"` |
-| `colorScheme` | `"light" \| "dark" \| "system"`                                              | `"system"`       |
-| `className`   | `string`                                                                     |                  |
+| Prop                    | Type                                                                         | Default          |
+| ----------------------- | ---------------------------------------------------------------------------- | ---------------- |
+| `trigger`               | `ReactNode \| ((api: { open(): void; busy: boolean }) => ReactNode) \| null` | floating button  |
+| `position`              | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"`               | `"bottom-right"` |
+| `colorScheme`           | `"light" \| "dark" \| "system"`                                              | `"system"`       |
+| `className`             | `string`                                                                     |                  |
+| `onSubmitted`           | `(report: ReportListItem) => void`                                           |                  |
+| `openThreadAfterSubmit` | `boolean`                                                                    | `true`           |
 
 - `trigger` as a node replaces the floating button's content. As a function it renders your own
   trigger in place, without the floating wrapper. `null` renders no trigger: open the widget from
@@ -43,11 +46,25 @@ in-browser fake model (`createMemoryTransport` from `@elicitor/react/testing`).
 - The flow: region select → one sentence → thread panel with questions, replies, the summary
   read-back, confirm and the "sent" state. Escape closes the dialog and the panel; focus returns
   to the element that opened them.
+- The default trigger is disabled (and the render prop's `busy` is true) while the region select
+  runs and while the report is being sent. Focus still goes back to it afterwards.
+- `onSubmitted` gets the new report once it was sent. With `openThreadAfterSubmit={false}` the
+  widget closes instead of opening the thread panel (no report request is made), so the host can
+  show the report on its own page, for example by navigating there from `onSubmitted`.
 
-### `<ReportThread reportId viewer? colorScheme? className? />`
+### `<ReportThread reportId showScreenshot? header? renderError? colorScheme? className? />`
 
 One report: its messages (a `role="log"` live region), the reply box, the pending summary with
-confirm, and withdraw. `viewer="other"` labels the reporter's messages "Reporter" instead of "You".
+confirm, and withdraw. The reporter's messages are labelled "You" when `report.viewerIsReporter`
+(decided by the host) and "Reporter" otherwise.
+
+- `showScreenshot` shows `report.screenshotPng` under the title (alt text: the `reportScreenshot`
+  key).
+- `header`: a node shown at the top of the thread, or a function of the loaded report.
+- `renderError(error, retry)`: your own message for a failed load, for example for a transport
+  error with `code === "unavailable"`. Return `null` or `undefined` to keep the default notice.
+- The pending summary card is shown from `report.pendingSummary` even when the host returns no
+  message with `pendingSummarySeq`; it then follows the log.
 
 ### `<SummaryConfirm report onConfirm? onCorrect? busy? />`
 
@@ -57,10 +74,18 @@ pending and `report.canConfirm`; the "correct it" button only with `onCorrect` a
 `report.canReply`. There is no field editing: a correction is a reply in the thread, and the
 assistant answers it with a new summary. Only the latest summary can be confirmed.
 
-### `<ReportList onSelect? selectedId? colorScheme? className? />`
+### `<ReportList onSelect? getHref? renderRow? renderError? selectedId? colorScheme? className? />`
 
 The reporter's own reports, newest first: status label, unread marker, title (or the first
 sentence), number and date. Loads on mount. A row opened from the list stops showing as unread.
+
+- With `onSelect` alone, rows are buttons.
+- With `getHref(item)`, rows are links (`<a href>`). A plain click calls `onSelect` and, when
+  `onSelect` is given, prevents the browser's navigation so a client-side router can navigate; a
+  modified or middle click (new tab, new window) is left to the browser.
+- `renderRow(item, row)` replaces the row element; `row` has `unread`, `selected`, `href`,
+  `select()` and the default `content`.
+- `renderError(error, retry)` as on `ReportThread`, for a failed list load.
 
 ### Ownership
 
@@ -83,9 +108,12 @@ and `useMessages()` (`t(key, values?)`, `status(status)`, `kind(kind)`, `date(is
 
 ## Styling
 
-Import `@elicitor/react-ui/styles.css` once. Every rule is scoped under `.elicitor` (each widget root
-also carries `data-elicitor-ui`, which keeps it out of screenshots and region text). Theme it with
-CSS variables on `:root` or any ancestor; they win over the built-in light and dark values:
+Import `@elicitor/react-ui/styles.css` once. Every rule is scoped under `.elicitor`, the class every
+root carries. The `<Elicitor />` widget's own roots (trigger, dialogs, thread panel) also carry
+`data-elicitor-ui`, which keeps them out of screenshots and region text; `ReportThread`,
+`ReportList` and `SummaryConfirm` rendered by your page do not, so a report filed from that page
+captures it like any other content. Theme it with CSS variables on `:root` or any ancestor; they
+win over the built-in light and dark values:
 
 `--elicitor-fg`, `--elicitor-bg`, `--elicitor-muted`, `--elicitor-border`, `--elicitor-accent`,
 `--elicitor-accent-fg`, `--elicitor-danger`, `--elicitor-radius`, `--elicitor-font`,

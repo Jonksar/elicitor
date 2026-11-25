@@ -1,6 +1,6 @@
 import type { ReportDetail, Summary } from "@elicitor/core";
 import { isElicitorTransportError, useReport } from "@elicitor/react";
-import { type ReactElement, useId, useState } from "react";
+import { type ReactElement, type ReactNode, useId, useState } from "react";
 import { type ColorScheme, Notice, rootProps, StatusBadge, submitOnModEnter } from "./parts.tsx";
 import { type MessagesApi, useMessages } from "./use-messages.ts";
 
@@ -110,16 +110,37 @@ export function SummaryConfirm(props: SummaryConfirmProps): ReactElement | null 
   );
 }
 
+/**
+ * Renders a host's own message for a failed load. Return null or undefined to show the default
+ * notice. `retry` reloads.
+ */
+export type RenderError = (error: unknown, retry: () => void) => ReactNode;
+
 export interface ReportThreadProps {
   readonly reportId: string;
+  /** Show the report's screenshot (`report.screenshotPng`) under the title. Default false. */
+  readonly showScreenshot?: boolean;
   /**
-   * Who is looking: "reporter" labels the reporter's messages "You", "other" labels them
-   * "Reporter". Controls follow the report's canReply / canConfirm / canWithdraw either way.
+   * Rendered at the top of the thread. A node is always shown; a function is called with the
+   * loaded report.
    */
-  readonly viewer?: "reporter" | "other";
+  readonly header?: ReactNode | ((report: ReportDetail) => ReactNode);
+  /** The host's message for a failed load of the report, instead of the default notice. */
+  readonly renderError?: RenderError;
   readonly colorScheme?: ColorScheme;
   readonly className?: string;
 }
+
+/** The host's rendering of a load error, or the default when it returns nothing. */
+const errorNode = (
+  renderError: RenderError | undefined,
+  error: unknown,
+  retry: () => void,
+  fallback: () => ReactNode,
+): ReactNode => {
+  const custom = renderError?.(error, retry);
+  return custom === null || custom === undefined ? fallback() : custom;
+};
 
 const actionError = (error: unknown, failed: string | null, m: MessagesApi): string | null => {
   if (failed === "reply") return m.t("replyFailed");
@@ -134,15 +155,19 @@ const actionError = (error: unknown, failed: string | null, m: MessagesApi): str
 /** The thread without its own root: shared by <ReportThread> and the widget's panel. */
 export function ThreadBody({
   reportId,
-  viewer = "reporter",
   headingId,
   colorScheme,
+  showScreenshot = false,
+  header,
+  renderError,
 }: {
   readonly reportId: string;
-  readonly viewer?: "reporter" | "other";
   readonly headingId?: string;
   /** The enclosing root's scheme; the summary card is its own root and must match it. */
   readonly colorScheme: ColorScheme;
+  readonly showScreenshot?: boolean;
+  readonly header?: ReactNode | ((report: ReportDetail) => ReactNode);
+  readonly renderError?: RenderError;
 }): ReactElement {
   const m = useMessages();
   const state = useReport(reportId);
@@ -153,32 +178,38 @@ export function ThreadBody({
   const hintId = useId();
   const ownId = useId();
   const titleId = headingId ?? ownId;
+  const retry = () => void state.refresh();
+  const headerNode = typeof header === "function" ? (report ? header(report) : null) : header;
 
   if (!report) {
     if (status === "error") {
       const notFound = isElicitorTransportError(error) && error.code === "not_found";
       return (
         <div className="el-thread">
+          {headerNode}
           <h2 id={titleId} className="el-visually-hidden">
             {m.t(notFound ? "notFound" : "loadReportFailed")}
           </h2>
-          <Notice
-            kind="error"
-            action={
-              notFound ? undefined : (
-                <button type="button" className="el-link" onClick={() => void state.refresh()}>
-                  {m.t("retry")}
-                </button>
-              )
-            }
-          >
-            {m.t(notFound ? "notFound" : "loadReportFailed")}
-          </Notice>
+          {errorNode(renderError, error, retry, () => (
+            <Notice
+              kind="error"
+              action={
+                notFound ? undefined : (
+                  <button type="button" className="el-link" onClick={retry}>
+                    {m.t("retry")}
+                  </button>
+                )
+              }
+            >
+              {m.t(notFound ? "notFound" : "loadReportFailed")}
+            </Notice>
+          ))}
         </div>
       );
     }
     return (
       <div className="el-thread">
+        {headerNode}
         <h2 id={titleId} className="el-visually-hidden">
           {m.t("loading")}
         </h2>
@@ -200,7 +231,7 @@ export function ThreadBody({
   const summaryPending = report.pendingSummary !== null;
   const replyError = actionError(error, failed, m);
   const authorLabel = (author: ReportDetail["messages"][number]["author"]): string =>
-    author === "reporter" && viewer === "other" ? m.t("otherReporter") : m.t(author);
+    author === "reporter" && !report.viewerIsReporter ? m.t("otherReporter") : m.t(author);
   const reported =
     report.number !== undefined ? m.t("reportNumber", { number: report.number }) : null;
   // The summary turn is shown as the structured card in its place in the log: the pending one,
@@ -210,9 +241,21 @@ export function ThreadBody({
     (report.summary
       ? ([...report.messages].reverse().find((msg) => msg.author === "agent")?.seq ?? null)
       : null);
+  // A host may return the pending summary without the agent message it came from: the card then
+  // follows the log.
+  const summaryInLog = report.messages.some((message) => message.seq === summarySeq);
+  const summaryCard = (
+    <SummaryConfirm
+      report={report}
+      colorScheme={colorScheme}
+      busy={pending !== null}
+      onConfirm={() => void state.confirm().catch(() => {})}
+    />
+  );
 
   return (
     <div className="el-thread" aria-busy={pending !== null || undefined}>
+      {headerNode}
       <header className="el-thread-head">
         <div className="el-thread-meta">
           {reported && <span>{reported}</span>}
@@ -227,16 +270,19 @@ export function ThreadBody({
         </p>
       </header>
 
+      {showScreenshot && report.screenshotPng && (
+        <img
+          className="el-shot el-thread-shot"
+          src={`data:image/png;base64,${report.screenshotPng}`}
+          alt={m.t("reportScreenshot")}
+        />
+      )}
+
       <ol className="el-log" role="log" aria-live="polite" aria-labelledby={titleId}>
         {report.messages.map((message) =>
           message.seq === summarySeq ? (
             <li key={message.seq} className="el-msg-summary">
-              <SummaryConfirm
-                report={report}
-                colorScheme={colorScheme}
-                busy={pending !== null}
-                onConfirm={() => void state.confirm().catch(() => {})}
-              />
+              {summaryCard}
             </li>
           ) : (
             <li key={message.seq} className="el-msg" data-author={message.author}>
@@ -244,6 +290,11 @@ export function ThreadBody({
               <p className="el-msg-body">{message.body}</p>
             </li>
           ),
+        )}
+        {!summaryInLog && (report.pendingSummary ?? report.summary) && (
+          <li key="summary" className="el-msg-summary">
+            {summaryCard}
+          </li>
         )}
         {pending === "reply" && (
           <li className="el-msg" data-author="agent" data-thinking="">
@@ -281,18 +332,20 @@ export function ThreadBody({
       )}
 
       {replyError && <Notice kind="error">{replyError}</Notice>}
-      {status === "error" && failed === "load" && (
-        <Notice
-          kind="error"
-          action={
-            <button type="button" className="el-link" onClick={() => void state.refresh()}>
-              {m.t("retry")}
-            </button>
-          }
-        >
-          {m.t("loadReportFailed")}
-        </Notice>
-      )}
+      {status === "error" &&
+        failed === "load" &&
+        errorNode(renderError, error, retry, () => (
+          <Notice
+            kind="error"
+            action={
+              <button type="button" className="el-link" onClick={retry}>
+                {m.t("retry")}
+              </button>
+            }
+          >
+            {m.t("loadReportFailed")}
+          </Notice>
+        ))}
 
       {report.canReply && (
         <div className="el-reply">
@@ -347,16 +400,28 @@ export function ThreadBody({
   );
 }
 
-/** One report: its messages, the reply box, the pending summary with confirm, and withdraw. */
+/**
+ * One report: its messages, the reply box, the pending summary with confirm, and withdraw. The
+ * reporter's messages are labelled "You" or "Reporter" from `report.viewerIsReporter`.
+ */
 export function ReportThread(props: ReportThreadProps): ReactElement {
-  const { reportId, viewer, colorScheme = "system", className } = props;
+  const {
+    reportId,
+    showScreenshot = false,
+    header,
+    renderError,
+    colorScheme = "system",
+    className,
+  } = props;
   return (
     <div {...rootProps(colorScheme, className, "el-standalone")}>
       <ThreadBody
         key={reportId}
         reportId={reportId}
         colorScheme={colorScheme}
-        {...(viewer ? { viewer } : {})}
+        showScreenshot={showScreenshot}
+        header={header}
+        {...(renderError ? { renderError } : {})}
       />
     </div>
   );

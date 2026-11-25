@@ -168,7 +168,7 @@ export function App(): ReactElement {
                 <ReportThread
                   key={`${selected}:${owner}`}
                   reportId={selected}
-                  viewer={owner ? "reporter" : "other"}
+                  showScreenshot
                   colorScheme={scheme}
                 />
               </div>

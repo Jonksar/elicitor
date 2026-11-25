@@ -144,6 +144,8 @@ What the calls do:
   when the reporter has written again since (HTTP 409 in the REST shape).
 - The `ReportDetail` the browser receives is built by `store.toDetail`. `canAct` is your
   authorisation decision and drives `canReply`, `canConfirm` and `canWithdraw`.
+  `viewerIsReporter` (default: `canAct`) says whether the viewer filed the report; the thread
+  labels the reporter's messages "You" or "Reporter" from it.
 
 ### The prompt
 
@@ -164,11 +166,12 @@ createIntake({
 ```
 
 `buildSystemPrompt(options)` returns the exact string the model gets. It is deterministic, so the
-provider can cache it.
+provider can cache it. The glossary is introduced by "Short screen glossary (route: label):";
+`glossaryHeading` replaces that line when your labels follow another pattern.
 
 ### The model
 
-`anthropicModel()` reads `ANTHROPIC_API_KEY`. Options (`model`, `effort`, `thinking`, gateway
+`anthropicModel()` reads `ANTHROPIC_API_KEY` (only without a gateway `baseURL`). Options (`model`, `effort`, `thinking`, gateway
 `baseURL` and `defaultHeaders`, timeouts) are in
 [`packages/anthropic/README.md`](../packages/anthropic/README.md). For another provider, write a
 `ModelAdapter` ([adapters.md](adapters.md)); it is one method.

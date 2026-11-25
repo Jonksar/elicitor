@@ -1,30 +1,8 @@
 // Styles ship separately: import "@elicitor/react-ui/styles.css" once in your app.
-export {
-  type CaptureApi,
-  type CaptureResult,
-  createFetchTransport,
-  type ElicitorApi,
-  type ElicitorCaptureConfig,
-  ElicitorProvider,
-  type ElicitorProviderProps,
-  type ElicitorTransport,
-  type FetchTransportOptions,
-  type FlowState,
-  type FlowStep,
-  isElicitorActionError,
-  isElicitorTransportError,
-  type OpenOptions,
-  type RegionSelectLabels,
-  type ReportDetail,
-  type ReportListItem,
-  type ReportState,
-  type ReportStatus,
-  type Summary,
-  type SummaryKind,
-  useCapture,
-  useElicitor,
-  useReport,
-} from "@elicitor/react";
+
+// Everything of @elicitor/react (provider, hooks, transports, errors, wire types), so a host or a
+// custom transport needs only this package.
+export * from "@elicitor/react";
 export {
   Elicitor,
   type ElicitorPosition,
@@ -42,8 +20,9 @@ export {
   resolveMessages,
 } from "./i18n.ts";
 export type { ColorScheme } from "./parts.tsx";
-export { ReportList, type ReportListProps } from "./report-list.tsx";
+export { ReportList, type ReportListProps, type ReportRowState } from "./report-list.tsx";
 export {
+  type RenderError,
   ReportThread,
   type ReportThreadProps,
   SummaryConfirm,

@@ -1,3 +1,4 @@
+import type { ReportListItem } from "@elicitor/core";
 import { useElicitor } from "@elicitor/react";
 import {
   type ReactElement,
@@ -12,6 +13,7 @@ import { createPortal } from "react-dom";
 import {
   CloseButton,
   type ColorScheme,
+  canTakeFocus,
   Dialog,
   Notice,
   rootProps,
@@ -25,7 +27,10 @@ export type ElicitorPosition = "bottom-right" | "bottom-left" | "top-right" | "t
 export interface TriggerApi {
   /** Starts the region select with the widget's localised overlay texts. */
   open(): void;
-  /** True while the region select runs or a report is being sent. */
+  /**
+   * True while the region select runs or a report is being sent; `open()` does nothing then. The
+   * default trigger is disabled meanwhile.
+   */
   readonly busy: boolean;
 }
 
@@ -41,6 +46,13 @@ export interface ElicitorProps {
   /** Default "system" (follows prefers-color-scheme). */
   readonly colorScheme?: ColorScheme;
   readonly className?: string;
+  /** Called with the new report once the sentence was sent. */
+  readonly onSubmitted?: (report: ReportListItem) => void;
+  /**
+   * Show the new report's thread in the widget's panel after sending. Default true. With false
+   * the widget closes instead, for hosts that open their own report page from `onSubmitted`.
+   */
+  readonly openThreadAfterSubmit?: boolean;
 }
 
 function TriggerIcon(): ReactElement {
@@ -62,12 +74,16 @@ function TriggerIcon(): ReactElement {
 function ComposeDialog({
   colorScheme,
   className,
+  onSend,
+  returnFocus,
 }: {
   readonly colorScheme: ColorScheme;
   readonly className: string | undefined;
+  readonly onSend: (sentence: string) => void;
+  readonly returnFocus: () => HTMLElement | null;
 }): ReactElement {
   const m = useMessages();
-  const { flow, submit, close } = useElicitor();
+  const { flow, close } = useElicitor();
   const [sentence, setSentence] = useState("");
   const titleId = useId();
   const hintId = useId();
@@ -75,10 +91,10 @@ function ComposeDialog({
   const screenshot = flow.capture?.screenshotPng ?? "";
   const send = () => {
     if (sending || !sentence.trim()) return;
-    void submit(sentence).catch(() => {});
+    onSend(sentence);
   };
   return (
-    <div {...rootProps(colorScheme, className, "el-backdrop")}>
+    <div {...rootProps(colorScheme, className, "el-backdrop", true)}>
       <Dialog
         modal
         labelledBy={titleId}
@@ -87,6 +103,7 @@ function ComposeDialog({
         className="el-dialog"
         colorScheme={colorScheme}
         busy={sending}
+        returnFocus={returnFocus}
       >
         <header className="el-dialog-head">
           <h2 id={titleId} className="el-dialog-title">
@@ -198,25 +215,53 @@ function ThreadPanel({
 export function Elicitor(props: ElicitorProps): ReactElement {
   const { trigger, position = "bottom-right", colorScheme = "system", className } = props;
   const m = useMessages();
-  const { flow, open: openFlow, close } = useElicitor();
+  const { flow, open: openFlow, close, submit } = useElicitor();
   const { overlayLabels } = m;
   const busy = flow.step === "selecting" || flow.step === "submitting";
+  const latest = useRef(props);
+  latest.current = props;
+  // What had focus when the flow opened (normally the trigger). The default trigger is disabled
+  // while busy, so focus handed back to it then is lost; it is restored from here instead.
+  const opener = useRef<HTMLElement | null>(null);
   const open = useCallback(() => {
+    const active = document.activeElement;
+    opener.current = canTakeFocus(active) ? active : null;
     void openFlow({ labels: overlayLabels }).catch(() => {});
   }, [openFlow, overlayLabels]);
-  // The trigger stays enabled while busy (open() is a no-op then) so focus can return to it.
+  const returnFocus = useCallback(() => (opener.current?.isConnected ? opener.current : null), []);
+  const send = useCallback(
+    (sentence: string) => {
+      const openThread = latest.current.openThreadAfterSubmit !== false;
+      submit(sentence, { openThread }).then(
+        (report) => latest.current.onSubmitted?.(report),
+        () => {},
+      );
+    },
+    [submit],
+  );
+  // A cancelled or failed region select hands focus back while the trigger is still disabled.
+  const previousStep = useRef(flow.step);
+  useEffect(() => {
+    const before = previousStep.current;
+    previousStep.current = flow.step;
+    if (before !== "selecting" || flow.step !== "idle") return;
+    if (canTakeFocus(document.activeElement)) return;
+    const target = returnFocus();
+    if (canTakeFocus(target)) target.focus();
+  }, [flow.step, returnFocus]);
 
   let triggerNode: ReactNode = null;
   if (typeof trigger === "function") {
     triggerNode = trigger({ open, busy });
   } else if (trigger !== null) {
     triggerNode = createPortal(
-      <div {...rootProps(colorScheme, className, "el-fab")} data-position={position}>
+      <div {...rootProps(colorScheme, className, "el-fab", true)} data-position={position}>
         <button
           type="button"
           className="el-trigger"
           aria-haspopup="dialog"
           aria-busy={busy || undefined}
+          disabled={busy}
           onClick={open}
         >
           {trigger === undefined ? (
@@ -239,13 +284,18 @@ export function Elicitor(props: ElicitorProps): ReactElement {
       {triggerNode}
       {composing &&
         createPortal(
-          <ComposeDialog colorScheme={colorScheme} className={className} />,
+          <ComposeDialog
+            colorScheme={colorScheme}
+            className={className}
+            onSend={send}
+            returnFocus={returnFocus}
+          />,
           document.body,
         )}
       {flow.step === "thread" &&
         flow.reportId !== null &&
         createPortal(
-          <div {...rootProps(colorScheme, className, "el-dock")} data-position={position}>
+          <div {...rootProps(colorScheme, className, "el-dock", true)} data-position={position}>
             <ThreadPanel reportId={flow.reportId} position={position} colorScheme={colorScheme} />
           </div>,
           document.body,
@@ -253,7 +303,7 @@ export function Elicitor(props: ElicitorProps): ReactElement {
       {flow.step === "idle" &&
         flow.error !== null &&
         createPortal(
-          <div {...rootProps(colorScheme, className, "el-dock")} data-position={position}>
+          <div {...rootProps(colorScheme, className, "el-dock", true)} data-position={position}>
             <div className="el-toast">
               <Notice kind="error" action={<CloseButton label={m.t("close")} onClick={close} />}>
                 {m.t("captureFailed")}

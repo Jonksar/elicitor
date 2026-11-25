@@ -1,5 +1,14 @@
+import type { ElicitorProviderProps } from "@elicitor/react";
 import { describe, expect, it } from "vitest";
-import { bundles, formatMessage, type Locale, normalizeLocale, resolveMessages } from "./i18n.ts";
+import {
+  bundles,
+  formatMessage,
+  type Locale,
+  type MessageOverrides,
+  type Messages,
+  normalizeLocale,
+  resolveMessages,
+} from "./i18n.ts";
 
 const locales = Object.keys(bundles) as Locale[];
 
@@ -58,6 +67,27 @@ describe("resolveMessages", () => {
 
   it("falls back to English for an unknown locale", () => {
     expect(resolveMessages("xx").send).toBe("Send");
+  });
+
+  // Compile-time check (pnpm typecheck): every shape a host types its texts with is accepted by
+  // the provider's `messages` prop without a cast.
+  it("accepts a full bundle, a partial one and a plain record as the provider's messages", () => {
+    const full: Messages = { ...bundles.en, report: "Send feedback" };
+    const partial: Partial<Messages> = { list: "My feedback" };
+    const overrides: MessageOverrides = { send: "Go" };
+    const plain: Record<string, string> = { close: "Done" };
+    const accepted: Array<NonNullable<ElicitorProviderProps["messages"]>> = [
+      full,
+      partial,
+      overrides,
+      plain,
+    ];
+    expect(accepted.map((messages) => resolveMessages("en", messages))).toMatchObject([
+      { report: "Send feedback" },
+      { list: "My feedback" },
+      { send: "Go" },
+      { close: "Done" },
+    ]);
   });
 });
 

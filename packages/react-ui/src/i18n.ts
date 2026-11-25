@@ -1,7 +1,10 @@
 import type { SummaryKind } from "@elicitor/core";
 
-/** Every UI text of the widget. The four bundles below have exactly these keys. */
-export interface Messages {
+/**
+ * Every UI text of the widget. The four bundles below have exactly these keys. A type alias (not
+ * an interface) so a full bundle is also a plain string record, as the provider's `messages` takes.
+ */
+export type Messages = {
   /** Trigger button and its accessible name. */
   readonly report: string;
   /** Title of the reporter's own report list. */
@@ -20,7 +23,10 @@ export interface Messages {
   /** Creating the report failed. */
   readonly failed: string;
   readonly captureFailed: string;
+  /** Alt text of the compose dialog's screenshot. */
   readonly screenshot: string;
+  /** Alt text of the screenshot in `<ReportThread showScreenshot />`. */
+  readonly reportScreenshot: string;
   readonly empty: string;
   readonly loading: string;
   readonly loadFailed: string;
@@ -67,7 +73,7 @@ export interface Messages {
   readonly sentTitle: string;
   /** "{list}" is the list title. */
   readonly sentBody: string;
-}
+};
 
 export type MessageKey = keyof Messages;
 export type Locale = "en" | "et" | "fi" | "ru";
@@ -87,6 +93,7 @@ const en: Messages = {
   failed: "Could not save the bug report. Try again.",
   captureFailed: "Could not capture the screen. Try again.",
   screenshot: "Bug report screenshot",
+  reportScreenshot: "Screenshot of the report",
   empty: "You have no bug reports yet.",
   loading: "Loading…",
   loadFailed: "Could not load bug reports.",
@@ -146,6 +153,7 @@ const et: Messages = {
   failed: "Veateate salvestamine ebaõnnestus. Proovi uuesti.",
   captureFailed: "Kuvatõmmise loomine ebaõnnestus. Proovi uuesti.",
   screenshot: "Veateate kuvatõmmis",
+  reportScreenshot: "Veateate kuvatõmmis",
   empty: "Sul ei ole veel veateateid.",
   loading: "Laadin…",
   loadFailed: "Veateadete laadimine ebaõnnestus.",
@@ -205,6 +213,7 @@ const fi: Messages = {
   failed: "Vikailmoituksen tallentaminen epäonnistui. Yritä uudelleen.",
   captureFailed: "Näytön kaappaaminen epäonnistui. Yritä uudelleen.",
   screenshot: "Vikailmoituksen kuvakaappaus",
+  reportScreenshot: "Ilmoituksen kuvakaappaus",
   empty: "Sinulla ei ole vielä vikailmoituksia.",
   loading: "Ladataan…",
   loadFailed: "Vikailmoitusten lataaminen epäonnistui.",
@@ -265,6 +274,7 @@ const ru: Messages = {
   failed: "Не удалось сохранить сообщение об ошибке. Попробуйте ещё раз.",
   captureFailed: "Не удалось сделать снимок экрана. Попробуйте ещё раз.",
   screenshot: "Снимок экрана к сообщению об ошибке",
+  reportScreenshot: "Снимок экрана из сообщения",
   empty: "У вас пока нет сообщений об ошибках.",
   loading: "Загрузка…",
   loadFailed: "Не удалось загрузить сообщения об ошибках.",
@@ -325,7 +335,7 @@ export const normalizeLocale = (locale: string): Locale => {
  */
 export const resolveMessages = (
   locale: string,
-  overrides: Readonly<Record<string, string>> = {},
+  overrides: Readonly<Record<string, string | undefined>> = {},
 ): Messages => {
   const base = bundles[normalizeLocale(locale)];
   const result: Record<string, string> = { ...base };

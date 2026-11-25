@@ -182,7 +182,8 @@ memory from the moment the provider mounts. When a report is created the browser
 
 Screenshot, region text, user agent and console errors can each be switched off in the provider's
 `capture` option; the request log and metadata are only sent if you supply them. Anything inside an
-element with `data-elicitor-ui` is left out of the screenshot and region text. The model provider
+element with `data-elicitor-ui` (the widget's own trigger, dialogs and panel carry it) is left out of
+the screenshot and region text. The model provider
 receives the sentence, replies, route, region text, the context JSON and the screenshot; it does
 not receive the metadata or the rectangle coordinates. Storage, encryption, retention and
 authorisation are the host's. Full field list: [docs/privacy.md](docs/privacy.md).

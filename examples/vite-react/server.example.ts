@@ -10,6 +10,7 @@ const prompt = { productDescription: "an online shop" };
 const intake = createIntake({ model: anthropicModel(), store, prompt });
 const STATUS: Readonly<Record<string, number>> = { not_found: 404, invalid: 400, stale: 409 };
 const NOT_FOUND: [number, unknown] = [404, { error: { code: "not_found" } }];
+const METHOD_NOT_ALLOWED: [number, unknown] = [405, { error: { code: "method_not_allowed" } }];
 // Authorisation is yours: a real server checks that the signed-in user owns the report.
 const detail = (id: string): [number, unknown] => {
   const report = store.toDetail(id, { canAct: true });
@@ -28,6 +29,7 @@ const route = async (req: IncomingMessage): Promise<[number, unknown]> => {
   const [, rawId, action] = match;
   if (rawId === undefined) {
     if (req.method === "GET") return [200, store.list()];
+    if (req.method !== "POST") return METHOD_NOT_ALLOWED;
     const input = (await json(req)) as unknown as CreateReportInput;
     const screenshotPng = input.screenshotPng || null;
     const { id } = await intake.start({
@@ -38,7 +40,8 @@ const route = async (req: IncomingMessage): Promise<[number, unknown]> => {
     return [201, store.toListItem(id)];
   }
   const id = decodeURIComponent(rawId);
-  if (action === undefined) return detail(id);
+  if (action === undefined) return req.method === "GET" ? detail(id) : METHOD_NOT_ALLOWED;
+  if (req.method !== "POST") return METHOD_NOT_ALLOWED;
   if (action === "reply") await intake.reply(id, String((await json(req)).body));
   else if (action === "confirm") await intake.confirm(id, Number((await json(req)).expectedSeq));
   else if (action === "withdraw") await intake.withdraw(id);

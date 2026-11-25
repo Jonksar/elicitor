@@ -3,18 +3,24 @@ import { type KeyboardEvent, type ReactElement, type ReactNode, useEffect, useRe
 
 export type ColorScheme = "light" | "dark" | "system";
 
-/** Props every widget root carries: the scope class, the capture exclusion and the scheme. */
+/**
+ * Props every root carries: the scope class and the scheme. Only the `<Elicitor />` widget's own
+ * roots (`widget: true`: trigger, dialogs, panel) also carry `data-elicitor-ui`, which keeps them
+ * out of screenshots and region text. Components a host page renders itself are captured like the
+ * rest of the page. Styles never depend on the attribute.
+ */
 export const rootProps = (
   colorScheme: ColorScheme,
   className: string | undefined,
   extra?: string,
+  widget = false,
 ): {
   className: string;
-  "data-elicitor-ui": "";
+  "data-elicitor-ui"?: "";
   "data-elicitor-scheme": ColorScheme;
 } => ({
   className: ["elicitor", extra, className].filter(Boolean).join(" "),
-  "data-elicitor-ui": "",
+  ...(widget ? { "data-elicitor-ui": "" as const } : {}),
   "data-elicitor-scheme": colorScheme,
 });
 
@@ -35,25 +41,38 @@ export interface DialogProps {
   readonly className: string;
   readonly colorScheme: ColorScheme;
   readonly busy?: boolean;
+  /** Where focus goes on unmount when nothing usable had focus at mount (focus was lost). */
+  readonly returnFocus?: () => HTMLElement | null;
   readonly children: ReactNode;
 }
 
+/** An element focus can go back to: still in the page, not the body, not disabled. */
+export const canTakeFocus = (element: Element | null): element is HTMLElement =>
+  element instanceof HTMLElement &&
+  element.isConnected &&
+  element !== document.body &&
+  !(element as HTMLButtonElement).disabled;
+
 /**
  * A dialog: focus moves in on mount (to `[data-autofocus]` or the dialog itself) and back to the
- * previously focused element on unmount; Escape calls onClose; a modal one keeps Tab inside.
+ * previously focused element on unmount (or `returnFocus()` when that was lost); Escape calls
+ * onClose; a modal one keeps Tab inside.
  */
 export function Dialog(props: DialogProps): ReactElement {
   const { modal, labelledBy, describedBy, className, colorScheme, busy, children } = props;
   const ref = useRef<HTMLDivElement>(null);
   const onClose = useRef(props.onClose);
   onClose.current = props.onClose;
+  const returnFocus = useRef(props.returnFocus);
+  returnFocus.current = props.returnFocus;
 
   useEffect(() => {
     const previous = document.activeElement;
     const node = ref.current;
     (node?.querySelector<HTMLElement>("[data-autofocus]") ?? node)?.focus();
     return () => {
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+      const target = canTakeFocus(previous) ? previous : (returnFocus.current?.() ?? null);
+      if (canTakeFocus(target)) target.focus();
     };
   }, []);
 
@@ -85,7 +104,7 @@ export function Dialog(props: DialogProps): ReactElement {
   return (
     <div
       ref={ref}
-      {...rootProps(colorScheme, className)}
+      {...rootProps(colorScheme, className, undefined, true)}
       role="dialog"
       aria-modal={modal ? "true" : undefined}
       aria-labelledby={labelledBy}

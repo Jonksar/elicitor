@@ -103,6 +103,9 @@ adapter for the Vercel AI SDK is planned for 0.2.
 - With a script, each call consumes the next step: a `Turn` (sent as JSON), a raw string, an
   `Error` to throw, or a function of the request. A call after the last step throws.
 - `requests` records every `ModelRequest` it received, for assertions.
+- Options instead of a bare script: `createFakeModel({ script?, publicSummary?, record? })`.
+  `publicSummary` sets the built-in agent's public summary. `record: false` keeps `requests`
+  empty, so a long-lived fake (a development server) holds no memory per call.
 
 ```ts
 import { createFakeModel, createIntake, createMemoryStore } from "@elicitor/core";
@@ -136,7 +139,7 @@ fallback path or running with the assistant switched off.
 
 ```ts
 interface ReportStore {
-  create(input: NewReport): Promise<{ id: string; seq: number }>;
+  create?(input: NewReport): Promise<{ id: string; seq: number }>; // needed by intake.start only
   get(id: string): Promise<StoredReport | null>;
   loadCapture(id: string): Promise<Capture | null>;
   appendReporterMessage(
@@ -153,7 +156,9 @@ The rules:
 
 - **`create`** saves the report in status `intake` with the sentence as message seq 1, plus the
   capture (`language`, `route`, `regionText`, `context`, `screenshotPng`), the `region` and the
-  opaque `metadata`. Returns the new id and seq `1`.
+  opaque `metadata`. Returns the new id and seq `1`. Only `intake.start` calls it (and throws a
+  `TypeError` without it): hosts that create rows themselves leave it out and call
+  `intake.advance` (see "Running turns elsewhere").
 - **`get`** returns messages ordered by seq. Agent messages carry the parsed `turn`; core rebuilds
   the model history from it.
 - **`loadCapture`** returns what `create` saved; core needs it for every later turn.
@@ -173,8 +178,8 @@ check-then-write across calls, so a check in one query and a write in another ca
 between two tabs, or between a slow model call and a withdraw. Errors a store throws pass through
 core unchanged (so the host can answer 503); they never trigger the unavailable fallback.
 
-The browser-facing mapping (`ReportListItem`, `ReportDetail`, the `can*` flags, unread markers, the
-list query) is not part of `ReportStore`. `createMemoryStore` adds `list`, `toListItem`, `toDetail`,
+The browser-facing mapping (`ReportListItem`, `ReportDetail`, the `can*` flags, `viewerIsReporter`,
+unread markers, the list query) is not part of `ReportStore`. `createMemoryStore` adds `list`, `toListItem`, `toDetail`,
 `markSeen`, `setStatus` and `metadataOf` for convenience; with your own store this is host code.
 `pendingSummaryOf(messages, status)` from core gives the pending summary and its seq for a
 `ReportDetail`.
@@ -281,7 +286,12 @@ does not need to be atomic with the write.
 `intake.start` and `intake.reply` run the model turn before they resolve. A host that creates the
 report row itself (for example in its own transaction) can call
 `intake.advance(id, expectedSeq, capture)` to run the turn that answers message `expectedSeq`; the
-same `commitTurn` rule drops it if the report moved on.
+same `commitTurn` rule drops it if the report moved on. Such a store needs no `create`.
+
+`start`, `reply` and `advance` take `{ signal }` as their last argument. It is passed to the model
+call. When it is aborted (the client went away, the request was cancelled), the call rejects with
+the signal's reason and commits nothing: a reply already saved stays saved, the report stays in
+`intake`, and the submit-as-written fallback does not run.
 
 ## Transports
 
@@ -308,8 +318,9 @@ re-exported by `@elicitor/react-ui`) speaks the REST shape documented in
 ### Custom
 
 Anything that can reach your server works: tRPC, GraphQL, a WebSocket, an Electron IPC bridge.
-Throw `ElicitorTransportError` from `@elicitor/react` with the codes the UI understands, so a stale
-confirm shows "The summary has changed" instead of a generic error:
+Throw `ElicitorTransportError` (from `@elicitor/react`, or `@elicitor/react-ui`, which re-exports
+it) with the codes the UI understands, so a stale confirm shows "The summary has changed" instead of
+a generic error:
 
 ```ts
 import type { ElicitorTransport } from "@elicitor/core";

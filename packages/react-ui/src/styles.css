@@ -483,6 +483,13 @@
   background: var(--_subtle);
 }
 
+/* The whole screen as marked, on a report page. */
+.elicitor .el-thread-shot {
+  max-height: 50vh;
+  object-fit: contain;
+  object-position: center;
+}
+
 /* Thread panel ----------------------------------------------------------------------------- */
 
 .elicitor.el-dock {
@@ -817,15 +824,23 @@
   text-align: start;
 }
 
-.elicitor button.el-row {
+.elicitor button.el-row,
+.elicitor a.el-row {
   cursor: pointer;
 }
 
-.elicitor button.el-row:hover {
+.elicitor a.el-row {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.elicitor button.el-row:hover,
+.elicitor a.el-row:hover {
   background: var(--_subtle);
 }
 
-.elicitor button.el-row[aria-current="true"] {
+.elicitor button.el-row[aria-current="true"],
+.elicitor a.el-row[aria-current="true"] {
   background: var(--_accent-soft);
 }
 

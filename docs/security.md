@@ -12,8 +12,9 @@ To report a vulnerability in Elicitor itself, see [SECURITY.md](../SECURITY.md).
 - Check ownership (or your own roles) before `get`, `reply`, `confirm` and `withdraw`, and filter
   `list` to the reports the user may see. Answer 404 rather than 403 if report ids should not be
   probeable.
-- Compute `canReply`, `canConfirm` and `canWithdraw` on the server. With `createMemoryStore`, pass
-  your decision as `toDetail(id, { canAct })`; with your own store, set the flags yourself. The UI
+- Compute `canReply`, `canConfirm`, `canWithdraw` and `viewerIsReporter` on the server. With
+  `createMemoryStore`, pass your decision as `toDetail(id, { canAct, viewerIsReporter? })`; with
+  your own store, set the flags yourself. The UI
   hides controls when a flag is false, but that is presentation only: the server must refuse the
   action as well.
 - The fetch transport leaves `credentials` to the `fetch` default (`same-origin`), so cookies go

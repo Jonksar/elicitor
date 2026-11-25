@@ -9,7 +9,7 @@ import { render } from "vitest-browser-react";
 import { Elicitor } from "./elicitor.tsx";
 import { bundles, type Locale } from "./i18n.ts";
 import { ReportList } from "./report-list.tsx";
-import { createReport, TestProvider } from "./test-helpers.tsx";
+import { createReport, deferred, TestProvider } from "./test-helpers.tsx";
 
 afterEach(() => {
   document.documentElement.style.removeProperty("--elicitor-fg");
@@ -394,6 +394,75 @@ describe("<Elicitor /> details", () => {
     await expect.element(trigger).toHaveFocus();
   });
 
+  it("disables the trigger while marking and gives focus back to it after a cancel", async () => {
+    await render(
+      <TestProvider transport={createMemoryTransport()}>
+        <Elicitor />
+      </TestProvider>,
+    );
+    const trigger = page.getByRole("button", { name: "Report a problem" });
+    await userEvent.click(trigger);
+    await expect.element(page.getByRole("button", { name: "Whole screen" })).toBeVisible();
+    expect((trigger.element() as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.keyboard("{Escape}");
+    await expect
+      .element(page.getByRole("button", { name: "Whole screen" }))
+      .not.toBeInTheDocument();
+    await expect.element(trigger).toBeEnabled();
+    await expect.element(trigger).toHaveFocus();
+  });
+
+  it("disables the trigger while sending", async () => {
+    const transport = createMemoryTransport();
+    const held = deferred<Awaited<ReturnType<MemoryTransport["create"]>>>();
+    const create = createSpy(transport).mockImplementationOnce(() => held.promise);
+    await render(
+      <TestProvider transport={transport}>
+        <Elicitor />
+      </TestProvider>,
+    );
+    await startReport("en", "The total is wrong");
+    const trigger = page.getByRole("button", { name: "Report a problem" });
+    await expect.element(trigger).toBeDisabled();
+    const input = create.mock.calls[0]![0];
+    create.mockRestore();
+    held.resolve(await transport.create(input));
+    await expect.element(page.getByRole("dialog", { name: "The total is wrong" })).toBeVisible();
+    await expect.element(trigger).toBeEnabled();
+  });
+
+  it("closes instead of opening the thread with openThreadAfterSubmit={false}", async () => {
+    const transport = createMemoryTransport();
+    const get = vi.spyOn(transport, "get");
+    const onSubmitted = vi.fn();
+    await render(
+      <TestProvider transport={transport}>
+        <Elicitor openThreadAfterSubmit={false} onSubmitted={onSubmitted} />
+      </TestProvider>,
+    );
+    await startReport("en", "The total is wrong");
+    await expect.poll(() => onSubmitted.mock.calls.length).toBe(1);
+    expect(onSubmitted.mock.calls[0]?.[0]).toMatchObject({ sentence: "The total is wrong" });
+    await expect
+      .element(page.getByRole("dialog", { name: "What is wrong?" }))
+      .not.toBeInTheDocument();
+    expect(page.getByRole("dialog").elements()).toHaveLength(0);
+    expect(get).not.toHaveBeenCalled();
+    await expect.element(page.getByRole("button", { name: "Report a problem" })).toHaveFocus();
+  });
+
+  it("reports the new report through onSubmitted when the thread opens too", async () => {
+    const onSubmitted = vi.fn();
+    await render(
+      <TestProvider transport={createMemoryTransport()}>
+        <Elicitor onSubmitted={onSubmitted} />
+      </TestProvider>,
+    );
+    await startReport("en", "The total is wrong");
+    await expect.element(page.getByRole("dialog", { name: "The total is wrong" })).toBeVisible();
+    expect(onSubmitted).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps Tab inside the compose dialog", async () => {
     await render(
       <TestProvider transport={createMemoryTransport()}>
@@ -414,7 +483,7 @@ describe("<Elicitor /> details", () => {
     await expect.element(dialog.getByRole("button", { name: "Send" })).toHaveFocus();
   });
 
-  it("leaves the widget's own text out of the captured region text", async () => {
+  it("leaves the widget's own text out of the captured region text, not the host's list", async () => {
     const transport = createMemoryTransport();
     await createReportThroughUi(transport);
     const create = createSpy(transport);
@@ -424,8 +493,10 @@ describe("<Elicitor /> details", () => {
     expect(input.regionText).toContain("Order total: 999.00");
     const captured = input.regionText.join("\n");
     expect(captured).not.toContain("Report a problem");
-    expect(captured).not.toContain("My bug reports");
-    expect(captured).not.toContain("The total is wrong");
+    // The host page's own report list is part of the page, as any other content.
+    expect(captured).toContain("My bug reports");
+    expect(captured).toContain("The total is wrong");
+    expect(document.querySelector(".el-fab")?.hasAttribute("data-elicitor-ui")).toBe(true);
   });
 });
 

@@ -1,5 +1,6 @@
 import "./styles.css";
 import type { ReportDetail } from "@elicitor/core";
+import { ElicitorTransportError } from "@elicitor/react";
 import { createMemoryTransport, type MemoryTransport } from "@elicitor/react/testing";
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
@@ -7,7 +8,11 @@ import { render } from "vitest-browser-react";
 import { Elicitor } from "./elicitor.tsx";
 import { ReportList } from "./report-list.tsx";
 import { ReportThread, SummaryConfirm } from "./report-thread.tsx";
-import { createReport, type Deferred, deferred, TestProvider } from "./test-helpers.tsx";
+import { CONTEXT, createReport, type Deferred, deferred, TestProvider } from "./test-helpers.tsx";
+
+/** A valid 1×1 PNG. */
+const PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
 /** A report with the assistant's summary pending (sentence, question, answer, summary). */
 const reportWithSummary = async (transport: MemoryTransport, sentence = "Wrong figure") => {
@@ -17,7 +22,7 @@ const reportWithSummary = async (transport: MemoryTransport, sentence = "Wrong f
 };
 
 describe("ownership", () => {
-  it("hides reply, confirm and withdraw from a non-owner", async () => {
+  it("labels the reporter's messages from viewerIsReporter and hides a non-owner's controls", async () => {
     const transport = createMemoryTransport();
     const id = await reportWithSummary(transport);
 
@@ -39,7 +44,7 @@ describe("ownership", () => {
     transport.actAs(false);
     await render(
       <TestProvider transport={transport}>
-        <ReportThread reportId={id} viewer="other" />
+        <ReportThread reportId={id} />
       </TestProvider>,
     );
     await expect.element(page.getByText("What should be shown there instead?")).toBeVisible();
@@ -285,4 +290,244 @@ it("sends a trimmed sentence and keeps the screenshot visible when submission fa
   expect(create.mock.calls[0]?.[0].sentence).toBe("Vale summa");
   await expect.element(dialog.getByRole("textbox")).toHaveValue("  Vale summa  ");
   await expect.element(dialog.getByRole("img", { name: "Veateate kuvatõmmis" })).toBeVisible();
+});
+
+describe("report page options", () => {
+  const withScreenshot = async (transport: MemoryTransport) =>
+    (
+      await transport.create({
+        sentence: "Wrong figure",
+        route: "/",
+        regionText: [],
+        context: CONTEXT,
+        screenshotPng: PNG,
+      })
+    ).id;
+
+  it("shows the screenshot only with showScreenshot, with a localised alt text", async () => {
+    const transport = createMemoryTransport();
+    const id = await withScreenshot(transport);
+    const plain = await render(
+      <TestProvider transport={transport} locale="et">
+        <ReportThread reportId={id} />
+      </TestProvider>,
+    );
+    await expect.element(page.getByRole("heading", { name: "Wrong figure" })).toBeVisible();
+    expect(page.getByRole("img").elements()).toHaveLength(0);
+    await plain.unmount();
+    await render(
+      <TestProvider transport={transport} locale="et">
+        <ReportThread reportId={id} showScreenshot />
+      </TestProvider>,
+    );
+    const image = page.getByRole("img", { name: "Veateate kuvatõmmis", exact: true });
+    await expect.element(image).toBeVisible();
+    expect(image.element().getAttribute("src")).toBe(`data:image/png;base64,${PNG}`);
+  });
+
+  it("renders a header node at once and a header function with the loaded report", async () => {
+    const transport = createMemoryTransport();
+    const { id } = await createReport(transport, "Wrong figure");
+    const held = deferred<ReportDetail>();
+    const get = vi.spyOn(transport, "get").mockImplementationOnce(() => held.promise);
+    const screen = await render(
+      <TestProvider transport={transport}>
+        <ReportThread reportId={id} header={<a href="/reports">All reports</a>} />
+      </TestProvider>,
+    );
+    await expect.element(page.getByRole("link", { name: "All reports" })).toBeVisible();
+    held.resolve(await transport.get(id));
+    get.mockRestore();
+    await screen.rerender(
+      <TestProvider transport={transport}>
+        <ReportThread reportId={id} header={(report) => <p>Filed at {report.route}</p>} />
+      </TestProvider>,
+    );
+    await expect.element(page.getByText("Filed at /")).toBeVisible();
+  });
+
+  it("shows the pending summary card when the host left out its message", async () => {
+    const transport = createMemoryTransport();
+    const id = await reportWithSummary(transport);
+    const full = await transport.get(id);
+    vi.spyOn(transport, "get").mockResolvedValue({
+      ...full,
+      messages: full.messages.filter((message) => message.seq !== full.pendingSummarySeq),
+    });
+    await render(
+      <TestProvider transport={transport}>
+        <ReportThread reportId={id} />
+      </TestProvider>,
+    );
+    const card = page.getByRole("region", { name: "Wrong figure" });
+    await expect.element(card).toBeVisible();
+    await userEvent.click(card.getByRole("button", { name: "Correct, send it on" }));
+    await expect.element(page.getByText("Submitted", { exact: true })).toBeVisible();
+  });
+
+  it("lets the host render its own load error and falls back to the default", async () => {
+    const transport = createMemoryTransport();
+    const { id } = await createReport(transport, "Wrong figure");
+    vi.spyOn(transport, "get")
+      .mockRejectedValueOnce(new ElicitorTransportError(503, "unavailable"))
+      .mockRejectedValueOnce(new Error("offline"));
+    const renderError = (error: unknown, retry: () => void) =>
+      error instanceof ElicitorTransportError && error.code === "unavailable" ? (
+        <p role="alert">
+          <span>Reports are down.</span>
+          <button type="button" onClick={retry}>
+            Again
+          </button>
+        </p>
+      ) : null;
+    await render(
+      <TestProvider transport={transport}>
+        <ReportThread reportId={id} renderError={renderError} />
+      </TestProvider>,
+    );
+    await expect.element(page.getByRole("alert").getByText("Reports are down.")).toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "Again" }));
+    // The second failure is not one the host handles: the default notice.
+    await expect
+      .element(page.getByRole("alert").getByText("Could not load the bug report."))
+      .toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "Try again" }));
+    await expect.element(page.getByRole("heading", { name: "Wrong figure" })).toBeVisible();
+  });
+
+  it("passes not found to renderError too", async () => {
+    await render(
+      <TestProvider transport={createMemoryTransport()}>
+        <ReportThread
+          reportId="missing"
+          renderError={(error) =>
+            error instanceof ElicitorTransportError && error.code === "not_found" ? (
+              <p>No such report here.</p>
+            ) : undefined
+          }
+        />
+      </TestProvider>,
+    );
+    await expect.element(page.getByText("No such report here.")).toBeVisible();
+  });
+});
+
+describe("<ReportList /> rows", () => {
+  /** Records whether React's handler prevented a click, then stops the navigation itself. */
+  const watchClicks = () => {
+    const prevented: Array<boolean> = [];
+    const listener = (event: MouseEvent) => {
+      prevented.push(event.defaultPrevented);
+      event.preventDefault();
+    };
+    window.addEventListener("click", listener);
+    return { prevented, stop: () => window.removeEventListener("click", listener) };
+  };
+
+  it("renders links with getHref; a plain click selects, a modified click is the link's", async () => {
+    const transport = createMemoryTransport();
+    const { id } = await createReport(transport, "Wrong figure");
+    const onSelect = vi.fn();
+    await render(
+      <TestProvider transport={transport}>
+        <ReportList getHref={(item) => `/reports/${item.id}`} onSelect={onSelect} />
+      </TestProvider>,
+    );
+    const link = page.getByRole("link", { name: /Wrong figure/ });
+    await expect.element(link).toHaveAttribute("href", `/reports/${id}`);
+    const clicks = watchClicks();
+    try {
+      link
+        .element()
+        .dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true }));
+      expect(onSelect).not.toHaveBeenCalled();
+      await userEvent.click(link);
+      expect(onSelect).toHaveBeenCalledWith(id);
+      expect(clicks.prevented).toEqual([false, true]);
+    } finally {
+      clicks.stop();
+    }
+  });
+
+  it("leaves navigation to the link without onSelect", async () => {
+    const transport = createMemoryTransport();
+    await createReport(transport, "Wrong figure");
+    await render(
+      <TestProvider transport={transport}>
+        <ReportList getHref={(item) => `/reports/${item.id}`} />
+      </TestProvider>,
+    );
+    const clicks = watchClicks();
+    try {
+      await userEvent.click(page.getByRole("link", { name: /Wrong figure/ }));
+      expect(clicks.prevented).toEqual([false]);
+    } finally {
+      clicks.stop();
+    }
+  });
+
+  it("renders the host's own rows with renderRow", async () => {
+    const transport = createMemoryTransport();
+    const { id } = await createReport(transport, "Wrong figure");
+    const onSelect = vi.fn();
+    await render(
+      <TestProvider transport={transport}>
+        <ReportList
+          onSelect={onSelect}
+          getHref={(item) => `#${item.id}`}
+          renderRow={(item, row) => (
+            <button type="button" data-href={row.href} onClick={row.select}>
+              {row.unread ? "New: " : ""}
+              {item.sentence}
+            </button>
+          )}
+        />
+      </TestProvider>,
+    );
+    const button = page.getByRole("button", { name: "New: Wrong figure" });
+    await expect.element(button).toHaveAttribute("data-href", `#${id}`);
+    await userEvent.click(button);
+    expect(onSelect).toHaveBeenCalledWith(id);
+    await expect.element(page.getByRole("button", { name: "Wrong figure" })).toBeVisible();
+  });
+
+  it("lets the host render its own list error", async () => {
+    const transport = createMemoryTransport();
+    vi.spyOn(transport, "list").mockRejectedValueOnce(
+      new ElicitorTransportError(503, "unavailable"),
+    );
+    await render(
+      <TestProvider transport={transport}>
+        <ReportList
+          renderError={(error, retry) =>
+            error instanceof ElicitorTransportError ? (
+              <button type="button" onClick={retry}>
+                Reports are down, retry
+              </button>
+            ) : null
+          }
+        />
+      </TestProvider>,
+    );
+    await userEvent.click(page.getByRole("button", { name: "Reports are down, retry" }));
+    await expect.element(page.getByText("You have no bug reports yet.")).toBeVisible();
+  });
+});
+
+describe("capture exclusion", () => {
+  it("leaves data-elicitor-ui off the components a host page renders", async () => {
+    const transport = createMemoryTransport();
+    const id = await reportWithSummary(transport);
+    const report = await transport.get(id);
+    await render(
+      <TestProvider transport={transport}>
+        <ReportList />
+        <ReportThread reportId={id} />
+        <SummaryConfirm report={report} />
+      </TestProvider>,
+    );
+    await expect.element(page.getByRole("textbox")).toBeVisible();
+    expect(document.querySelectorAll(".elicitor").length).toBeGreaterThanOrEqual(3);
+    expect(document.querySelectorAll("[data-elicitor-ui]")).toHaveLength(0);
+  });
 });
