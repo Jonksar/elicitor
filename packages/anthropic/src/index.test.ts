@@ -8,8 +8,8 @@ import {
   isIntakeUnavailable,
   type ModelRequest,
   type NewReport,
-  TURN_JSON_SCHEMA,
 } from "@elicitor/core";
+import { TURN_JSON_SCHEMA } from "@elicitor/core/engine";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { anthropicModel } from "./index.ts";
 

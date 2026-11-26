@@ -95,7 +95,7 @@ adapter for the Vercel AI SDK is planned for 0.2.
 
 ### The fake model
 
-`createFakeModel()` from `@elicitor/core` needs no key and no network:
+`createFakeModel()` from `@elicitor/core/testing` needs no key and no network:
 
 - Without a script it is a scripted agent: one question ("What should be shown there instead?",
   or the Estonian, Finnish or Russian equivalent), then a summary built from the first sentence and
@@ -108,7 +108,8 @@ adapter for the Vercel AI SDK is planned for 0.2.
   empty, so a long-lived fake (a development server) holds no memory per call.
 
 ```ts
-import { createFakeModel, createIntake, createMemoryStore } from "@elicitor/core";
+import { createIntake, createMemoryStore } from "@elicitor/core";
+import { createFakeModel } from "@elicitor/core/testing";
 
 const model = createFakeModel([
   { kind: "question", text: "Which order?" },
@@ -132,8 +133,8 @@ const intake = createIntake({
 });
 ```
 
-`unavailableModel(reason?)` is a model that always throws `IntakeUnavailable`, for testing the
-fallback path or running with the assistant switched off.
+`unavailableModel(reason?)`, also from `@elicitor/core/testing`, is a model that always throws
+`IntakeUnavailable`, for testing the fallback path or running with the assistant switched off.
 
 ## ReportStore
 

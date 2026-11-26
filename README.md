@@ -141,13 +141,13 @@ to `submitted` with a note that the assistant was unavailable. More in
 
 ## Packages
 
-| Package                                     | What it is                                                                                     |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`@elicitor/core`](packages/core)           | Intake engine, system prompt, output parser, fake model, in-memory store, wire types. No deps. |
-| [`@elicitor/anthropic`](packages/anthropic) | Model adapter for the Anthropic SDK, direct or through a gateway.                              |
-| [`@elicitor/capture`](packages/capture)     | Framework-free region marking, screenshot, region text and context capture in the browser.     |
-| [`@elicitor/react`](packages/react)         | Headless React provider, hooks, fetch transport and an in-memory test transport.               |
-| [`@elicitor/react-ui`](packages/react-ui)   | The ready-made widget: trigger, dialogs, thread, summary confirm, report list, one CSS file.   |
+| Package                                     | What it is                                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [`@elicitor/core`](packages/core)           | Intake engine, store and model contracts, in-memory store, wire types. No dependencies.      |
+| [`@elicitor/anthropic`](packages/anthropic) | Model adapter for the Anthropic SDK, direct or through a gateway.                            |
+| [`@elicitor/capture`](packages/capture)     | Framework-free region marking, screenshot, region text and context capture in the browser.   |
+| [`@elicitor/react`](packages/react)         | Headless React provider, hooks, fetch transport and an in-memory test transport.             |
+| [`@elicitor/react-ui`](packages/react-ui)   | The ready-made widget: trigger, dialogs, thread, summary confirm, report list, one CSS file. |
 
 An adapter for the Vercel AI SDK and a ready-made `@elicitor/server` are planned for 0.2. They do
 not exist yet.
