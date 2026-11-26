@@ -7,6 +7,7 @@ export {
   isElicitorError,
   isIntakeUnavailable,
 } from "./errors.ts";
+export { unavailableModel } from "./fake.ts";
 export {
   createIntake,
   DEFAULT_UNAVAILABLE_NOTES,

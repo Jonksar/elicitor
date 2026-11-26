@@ -38,6 +38,8 @@ Three entry points. Most hosts need only the first.
   server needs. For development, demos and tests; reports are lost on restart.
   `pendingSummaryOf(messages, status)` gives the pending summary and its seq when you build a
   `ReportDetail` over your own store.
+- `unavailableModel(reason?)`: a model that always throws `IntakeUnavailable`, for running with
+  the assistant switched off: every report is saved as written.
 - Defaults to extend: `DEFAULT_LANGUAGES`, `DEFAULT_UNAVAILABLE_NOTES`, `MAX_QUESTIONS` (4).
 - Errors: `IntakeUnavailable` / `isIntakeUnavailable` (the model gave no usable turn; core then
   submits the report as written) and `ElicitorError` / `isElicitorError` (`not_found`, `invalid`,
@@ -48,8 +50,8 @@ Three entry points. Most hosts need only the first.
 
 ### `@elicitor/core/testing`
 
-Model doubles that need no key and no network: `createFakeModel` (a script, or
-`{ script?, publicSummary?, record? }`) and `unavailableModel`.
+`createFakeModel` (a script, or `{ script?, publicSummary?, record? }`): a scripted model that
+needs no key and no network.
 
 ### `@elicitor/core/engine`
 

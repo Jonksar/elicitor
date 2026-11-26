@@ -5,7 +5,6 @@ import { expect, test } from "vitest";
 test("runtime exports of index.ts", async () => {
   expect(Object.keys(await import("./index.ts")).sort()).toMatchInlineSnapshot(`
     [
-      "CONSOLE_ERROR_LIMIT",
       "Elicitor",
       "ElicitorActionError",
       "ElicitorProvider",

@@ -16,6 +16,7 @@ test("runtime exports of index.ts", async () => {
       "isElicitorError",
       "isIntakeUnavailable",
       "pendingSummaryOf",
+      "unavailableModel",
     ]
   `);
 });
@@ -23,7 +24,6 @@ test("runtime exports of testing.ts", async () => {
   expect(Object.keys(await import("./testing.ts")).sort()).toMatchInlineSnapshot(`
     [
       "createFakeModel",
-      "unavailableModel",
     ]
   `);
 });

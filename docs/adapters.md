@@ -133,7 +133,7 @@ const intake = createIntake({
 });
 ```
 
-`unavailableModel(reason?)`, also from `@elicitor/core/testing`, is a model that always throws
+`unavailableModel(reason?)` from `@elicitor/core` is a model that always throws
 `IntakeUnavailable`, for testing the fallback path or running with the assistant switched off.
 
 ## ReportStore
