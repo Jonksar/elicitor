@@ -1,7 +1,7 @@
-import type { CreateReportInput, ReportDetail, ReportListItem } from "@elicitor/core";
+import type { CreateReportInput, ReportDetail, ReportListItem, RoadmapItem } from "@elicitor/core";
 import { describe, expect, it } from "vitest";
 import { ElicitorTransportError, isElicitorTransportError } from "./errors.ts";
-import { createFetchTransport } from "./fetch-transport.ts";
+import { createFetchRoadmapTransport, createFetchTransport } from "./fetch-transport.ts";
 
 interface Call {
   readonly url: string;
@@ -208,5 +208,67 @@ describe("createFetchTransport", () => {
       globalThis.fetch = original;
     }
     expect(calls).toHaveLength(1);
+  });
+});
+
+const roadmapItem: RoadmapItem = {
+  id: "shop/1 ?",
+  title: "Gift wrap",
+  description: "Add gift wrap at checkout.",
+  stage: "planned",
+  votes: 4,
+  viewerVoted: false,
+};
+
+describe("createFetchRoadmapTransport", () => {
+  it("lists, sets, and removes votes with the shared fetch options", async () => {
+    const voted = { ...roadmapItem, votes: 5, viewerVoted: true };
+    const { calls, fetch } = fakeFetch(({ method }) =>
+      json(method === "GET" ? [roadmapItem] : method === "PUT" ? voted : roadmapItem),
+    );
+    let token = 0;
+    const transport = createFetchRoadmapTransport("/api///", {
+      fetch,
+      credentials: "include",
+      headers: async () => ({ Authorization: `Bearer t${++token}` }),
+    });
+
+    expect(await transport.list()).toEqual([roadmapItem]);
+    expect(await transport.vote(roadmapItem.id, true)).toEqual(voted);
+    expect(await transport.vote(roadmapItem.id, false)).toEqual(roadmapItem);
+    expect(calls.map(({ method, url, body }) => [method, url, body])).toEqual([
+      ["GET", "/api/roadmap", undefined],
+      ["PUT", "/api/roadmap/shop%2F1%20%3F/vote", undefined],
+      ["DELETE", "/api/roadmap/shop%2F1%20%3F/vote", undefined],
+    ]);
+    expect(calls.map(({ headers }) => headers.get("Authorization"))).toEqual([
+      "Bearer t1",
+      "Bearer t2",
+      "Bearer t3",
+    ]);
+    expect(calls.every(({ credentials }) => credentials === "include")).toBe(true);
+    expect(calls.every(({ headers }) => headers.get("Accept") === "application/json")).toBe(true);
+  });
+
+  it("uses ElicitorTransportError for server, network, and invalid JSON failures", async () => {
+    const refused = fakeFetch(() => json({ error: { code: "invalid", message: "Shipped" } }, 400));
+    const error = await createFetchRoadmapTransport("/api", refused)
+      .vote("shop-1", true)
+      .catch((cause: unknown) => cause);
+    expect(isElicitorTransportError(error)).toBe(true);
+    expect(error).toMatchObject({ status: 400, code: "invalid", message: "Shipped" });
+
+    const cause = new TypeError("Failed to fetch");
+    const offline = createFetchRoadmapTransport("/api", {
+      fetch: async () => {
+        throw cause;
+      },
+    });
+    await expect(offline.list()).rejects.toMatchObject({ status: 0, code: "network", cause });
+    const html = fakeFetch(() => new Response("<html>"));
+    await expect(createFetchRoadmapTransport("/api", html).list()).rejects.toMatchObject({
+      status: 200,
+      code: "invalid_response",
+    });
   });
 });

@@ -37,23 +37,25 @@ has, but the tests run on React 19 only. The package has no runtime dependencies
 From `@elicitor/react`:
 
 - Component: `ElicitorProvider`.
-- Hooks: `useElicitor`, `useReport`, `useCapture`.
-- Transport factory: `createFetchTransport`.
+- Hooks: `useElicitor`, `useReport`, `useCapture`, `useRoadmap`.
+- Transport factories: `createFetchTransport`, `createFetchRoadmapTransport`.
 - Errors: `ElicitorTransportError` and `isElicitorTransportError`, `ElicitorActionError` and
   `isElicitorActionError`.
 - Types: `ElicitorProviderProps`, `ElicitorCaptureConfig`, `ElicitorApi`, `FlowState`, `FlowStep`,
   `OpenOptions`, `SubmitOptions`, `MessagesInput`, `CreateReportOptions`, `ReportsState`,
   `LoadStatus`, `ReportState`,
   `ReportAction`, `CaptureApi`, `CaptureStartOptions`, `FetchTransportOptions`,
-  `ElicitorActionErrorCode`.
+  `ElicitorActionErrorCode`, `RoadmapState`.
 - Types re-exported from `@elicitor/capture`: `CaptureResult`, `RegionSelectLabels`,
   `RegionSelectOptions`, `RequestLog`.
 - Types re-exported from `@elicitor/core`: `ElicitorTransport`, `CreateReportInput`,
   `ReportListItem`, `ReportDetail`, `ReportStatus`, `Summary`, `SummaryKind`, `MessageAuthor`,
-  `Region`, `CaptureContext`, `RequestLogEntry`, `ConsoleErrorEntry`.
+  `Region`, `CaptureContext`, `RequestLogEntry`, `ConsoleErrorEntry`, `RoadmapStage`,
+  `RoadmapItem`, `RoadmapTransport`.
 
-From `@elicitor/react/testing`: `createMemoryTransport`, and the types `MemoryTransport` and
-`MemoryTransportOptions`.
+From `@elicitor/react/testing`: `createMemoryTransport`, `createMemoryRoadmapTransport`, and the
+types `MemoryTransport`, `MemoryTransportOptions`, `MemoryRoadmapTransport` and
+`MemoryRoadmapTransportOptions`.
 
 ## Error contract
 
@@ -137,6 +139,7 @@ interface ElicitorCaptureConfig {
 ## `useElicitor()`
 
 ```ts
+function useElicitor(options: { readonly optional: true }): ElicitorApi | null;
 function useElicitor(): ElicitorApi; // throws "useElicitor() must be used inside <ElicitorProvider>"
 
 interface ElicitorApi {
@@ -367,6 +370,23 @@ class ElicitorTransportError extends Error {
 - A 2xx response whose body is not JSON (where one is expected) gives `code: "invalid_response"`.
 
 `isElicitorTransportError(error)` recognises the error across duplicate copies of this package.
+
+## Roadmap
+
+`createFetchRoadmapTransport(baseUrl, options?)` returns a `RoadmapTransport`. It accepts the
+same `FetchTransportOptions` as the report transport and uses GET `{base}/roadmap` and
+PUT or DELETE `{base}/roadmap/:id/vote`. Each vote response is the current `RoadmapItem` from
+the server, including the signed-in user's `viewerVoted` flag.
+
+`useRoadmap(transport)` works without an `ElicitorProvider`. It returns `RoadmapState` with
+`status`, `items`, `error`, `pendingIds`, `reload()` and `vote(id, voted)`. It loads on mount,
+updates votes optimistically and rolls back a failed vote. The server's response supplies the
+final item. Load and vote failures are stored in `error` and their promises resolve.
+
+`createMemoryRoadmapTransport(items?, options?)` from `@elicitor/react/testing` accepts optional
+`userId` and `delayMs`. It exposes the core memory backend as readonly `transport.roadmap` for
+tests and demos. See [Roadmap](../../docs/roadmap.md) for the wire types, server handler and
+curation contract.
 
 ## `ElicitorActionError`
 
