@@ -24,7 +24,10 @@ interface Session {
   load: number;
 }
 
-/** Loads a roadmap and keeps its votes in sync with the transport. No provider is needed. */
+/**
+ * Loads a roadmap and keeps its votes in sync with the transport. No provider is needed.
+ * The transport must be stable between renders; create it at module scope or with `useMemo`.
+ */
 export const useRoadmap = (transport: RoadmapTransport): RoadmapState => {
   const session = useRef<Session | null>(null);
   const [stored, setStored] = useState<{
