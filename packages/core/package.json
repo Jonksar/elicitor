@@ -1,6 +1,6 @@
 {
   "name": "@elicitor/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Intake engine for in-app bug reports: the conversation, the store and model contracts, an in-memory store.",
   "license": "MIT",
   "type": "module",

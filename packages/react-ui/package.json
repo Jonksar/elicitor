@@ -1,6 +1,6 @@
 {
   "name": "@elicitor/react-ui",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Ready-made React bug report widget for Elicitor.",
   "license": "MIT",
   "type": "module",

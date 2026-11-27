@@ -1,6 +1,6 @@
 {
   "name": "@elicitor/anthropic",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Anthropic SDK model adapter for Elicitor.",
   "license": "MIT",
   "type": "module",
