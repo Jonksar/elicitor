@@ -41,7 +41,6 @@ From `@elicitor/react`:
 - Transport factory: `createFetchTransport`.
 - Errors: `ElicitorTransportError` and `isElicitorTransportError`, `ElicitorActionError` and
   `isElicitorActionError`.
-
 - Types: `ElicitorProviderProps`, `ElicitorCaptureConfig`, `ElicitorApi`, `FlowState`, `FlowStep`,
   `OpenOptions`, `SubmitOptions`, `MessagesInput`, `CreateReportOptions`, `ReportsState`,
   `LoadStatus`, `ReportState`,
