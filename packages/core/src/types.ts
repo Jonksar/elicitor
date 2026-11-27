@@ -273,3 +273,26 @@ export interface ElicitorTransport {
   confirm(id: string, expectedSeq: number): Promise<ReportDetail>;
   withdraw(id: string): Promise<void>;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Roadmap
+// ---------------------------------------------------------------------------------------------
+
+export type RoadmapStage = "considering" | "planned" | "in_progress" | "shipped";
+
+export interface RoadmapItem {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly stage: RoadmapStage;
+  readonly votes: number;
+  /** Decided by the host from the viewer's session. */
+  readonly viewerVoted: boolean;
+  readonly url?: string;
+}
+
+export interface RoadmapTransport {
+  list(): Promise<ReadonlyArray<RoadmapItem>>;
+  /** Sets the viewer's vote idempotently and returns the current item. */
+  vote(id: string, voted: boolean): Promise<RoadmapItem>;
+}

@@ -9,6 +9,9 @@ export type {
   ReportListItem,
   ReportStatus,
   RequestLogEntry,
+  RoadmapItem,
+  RoadmapStage,
+  RoadmapTransport,
   Summary,
   SummaryKind,
 } from "@elicitor/core";
@@ -25,7 +28,11 @@ export {
   isElicitorActionError,
   isElicitorTransportError,
 } from "./errors.ts";
-export { createFetchTransport, type FetchTransportOptions } from "./fetch-transport.ts";
+export {
+  createFetchRoadmapTransport,
+  createFetchTransport,
+  type FetchTransportOptions,
+} from "./fetch-transport.ts";
 export {
   type CaptureApi,
   type CaptureStartOptions,
@@ -45,3 +52,4 @@ export {
   useElicitor,
 } from "./provider.tsx";
 export { type ReportAction, type ReportState, useReport } from "./use-report.ts";
+export { type RoadmapState, useRoadmap } from "./use-roadmap.ts";

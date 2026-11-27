@@ -1,14 +1,18 @@
 import {
   createIntake,
+  createMemoryRoadmap,
   createMemoryStore,
   type ElicitorTransport,
   type Intake,
   isElicitorError,
+  type MemoryRoadmap,
   type MemoryStore,
   type MemoryStoreOptions,
   type ModelAdapter,
   type ReportDetail,
   type ReportListItem,
+  type RoadmapItem,
+  type RoadmapTransport,
   type SystemPromptOptions,
 } from "@elicitor/core";
 import { createFakeModel } from "@elicitor/core/testing";
@@ -50,6 +54,17 @@ const asTransportError = (error: unknown): unknown =>
     ? new ElicitorTransportError(STATUS_BY_CODE[error.code] ?? 400, error.code, error.message)
     : error;
 
+const memoryRequest =
+  (delayMs = 0) =>
+  async <T>(body: () => T | Promise<T>): Promise<T> => {
+    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
+      return await body();
+    } catch (error) {
+      throw asTransportError(error);
+    }
+  };
+
 /**
  * An in-browser ElicitorTransport over core's intake, fake model and memory store, for tests,
  * demos and UI development. A non-owner gets canReply/canConfirm/canWithdraw false, and its
@@ -63,16 +78,7 @@ export const createMemoryTransport = (options: MemoryTransportOptions = {}): Mem
     prompt: options.prompt ?? { productDescription: "a web application" },
   });
   let owner = options.owner ?? true;
-  const delayMs = options.delayMs ?? 0;
-
-  const run = async <T>(body: () => Promise<T>): Promise<T> => {
-    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
-    try {
-      return await body();
-    } catch (error) {
-      throw asTransportError(error);
-    }
-  };
+  const run = memoryRequest(options.delayMs);
   const detail = (id: string): ReportDetail => {
     const value = store.toDetail(id, { canAct: owner, viewerIsReporter: owner });
     if (!value) throw new ElicitorTransportError(404, "not_found");
@@ -124,5 +130,30 @@ export const createMemoryTransport = (options: MemoryTransportOptions = {}): Mem
         ownerOnly();
         await intake.withdraw(id);
       }),
+  };
+};
+
+export interface MemoryRoadmapTransportOptions {
+  /** The signed-in user for every request. Default: "viewer". */
+  readonly userId?: string;
+  /** Milliseconds every call waits before it runs. Default 0. */
+  readonly delayMs?: number;
+}
+
+export interface MemoryRoadmapTransport extends RoadmapTransport {
+  readonly roadmap: MemoryRoadmap;
+}
+
+/** An in-browser roadmap for tests, demos and UI development. */
+export const createMemoryRoadmapTransport = (
+  items: ReadonlyArray<RoadmapItem> = [],
+  { userId = "viewer", delayMs }: MemoryRoadmapTransportOptions = {},
+): MemoryRoadmapTransport => {
+  const roadmap = createMemoryRoadmap(items, { userId });
+  const run = memoryRequest(delayMs);
+  return {
+    roadmap,
+    list: () => run(() => roadmap.list(userId)),
+    vote: (id, voted) => run(() => roadmap.vote(userId, id, voted)),
   };
 };

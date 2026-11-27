@@ -13,6 +13,7 @@ test("runtime exports of index.ts", async () => {
       "ReportThread",
       "SummaryConfirm",
       "bundles",
+      "createFetchRoadmapTransport",
       "createFetchTransport",
       "formatMessage",
       "isElicitorActionError",
@@ -23,6 +24,7 @@ test("runtime exports of index.ts", async () => {
       "useElicitor",
       "useMessages",
       "useReport",
+      "useRoadmap",
     ]
   `);
 });

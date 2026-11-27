@@ -3,6 +3,8 @@ import type {
   ElicitorTransport,
   ReportDetail,
   ReportListItem,
+  RoadmapItem,
+  RoadmapTransport,
 } from "@elicitor/core";
 import { ElicitorTransportError } from "./errors.ts";
 
@@ -26,29 +28,10 @@ const errorCodeOf = (body: unknown): { code: string | null; message: string | nu
   };
 };
 
-/**
- * An ElicitorTransport over the Elicitor REST shape (see the README):
- *
- *   POST {base}/reports                 CreateReportInput  -> 201/200 ReportListItem
- *   GET  {base}/reports                                    -> ReportListItem[]
- *   GET  {base}/reports/:id                                -> ReportDetail
- *   POST {base}/reports/:id/reply       { body }           -> ReportDetail
- *   POST {base}/reports/:id/confirm     { expectedSeq }    -> ReportDetail
- *   POST {base}/reports/:id/withdraw                       -> 204
- *
- * Any non-2xx response throws ElicitorTransportError(status, code) with `code` read from a JSON
- * body `{ "error": { "code": string, "message"?: string } }` when present.
- */
-export const createFetchTransport = (
-  baseUrl: string,
-  options: FetchTransportOptions = {},
-): ElicitorTransport => {
-  const base = baseUrl.replace(/\/+$/, "");
-  const reportUrl = (id: string, action?: string): string =>
-    `${base}/reports/${encodeURIComponent(id)}${action ? `/${action}` : ""}`;
-
-  const request = async (
-    method: "GET" | "POST",
+const fetchRequest =
+  (options: FetchTransportOptions) =>
+  async (
+    method: "GET" | "POST" | "PUT" | "DELETE",
     url: string,
     body?: unknown,
   ): Promise<Response> => {
@@ -82,18 +65,41 @@ export const createFetchTransport = (
     throw new ElicitorTransportError(response.status, code, message ?? undefined);
   };
 
-  const json = async <T>(response: Response): Promise<T> => {
-    try {
-      return (await response.json()) as T;
-    } catch (cause) {
-      throw new ElicitorTransportError(
-        response.status,
-        "invalid_response",
-        "Elicitor response is not JSON",
-        { cause },
-      );
-    }
-  };
+const json = async <T>(response: Response): Promise<T> => {
+  try {
+    return (await response.json()) as T;
+  } catch (cause) {
+    throw new ElicitorTransportError(
+      response.status,
+      "invalid_response",
+      "Elicitor response is not JSON",
+      { cause },
+    );
+  }
+};
+
+/**
+ * An ElicitorTransport over the Elicitor REST shape (see the README):
+ *
+ *   POST {base}/reports                 CreateReportInput  -> 201/200 ReportListItem
+ *   GET  {base}/reports                                    -> ReportListItem[]
+ *   GET  {base}/reports/:id                                -> ReportDetail
+ *   POST {base}/reports/:id/reply       { body }           -> ReportDetail
+ *   POST {base}/reports/:id/confirm     { expectedSeq }    -> ReportDetail
+ *   POST {base}/reports/:id/withdraw                       -> 204
+ *
+ * Any non-2xx response throws ElicitorTransportError(status, code) with `code` read from a JSON
+ * body `{ "error": { "code": string, "message"?: string } }` when present.
+ */
+export const createFetchTransport = (
+  baseUrl: string,
+  options: FetchTransportOptions = {},
+): ElicitorTransport => {
+  const base = baseUrl.replace(/\/+$/, "");
+  const reportUrl = (id: string, action?: string): string =>
+    `${base}/reports/${encodeURIComponent(id)}${action ? `/${action}` : ""}`;
+
+  const request = fetchRequest(options);
 
   return {
     create: async (input: CreateReportInput) =>
@@ -107,5 +113,21 @@ export const createFetchTransport = (
     withdraw: async (id) => {
       await request("POST", reportUrl(id, "withdraw"));
     },
+  };
+};
+
+/** A RoadmapTransport over the roadmap list and per-viewer vote endpoints. */
+export const createFetchRoadmapTransport = (
+  baseUrl: string,
+  options: FetchTransportOptions = {},
+): RoadmapTransport => {
+  const url = `${baseUrl.replace(/\/+$/, "")}/roadmap`;
+  const request = fetchRequest(options);
+  return {
+    list: async () => json<ReadonlyArray<RoadmapItem>>(await request("GET", url)),
+    vote: async (id, voted) =>
+      json<RoadmapItem>(
+        await request(voted ? "PUT" : "DELETE", `${url}/${encodeURIComponent(id)}/vote`),
+      ),
   };
 };

@@ -12,6 +12,7 @@ test("runtime exports of index.ts", async () => {
       "MAX_QUESTIONS",
       "buildSystemPrompt",
       "createIntake",
+      "createMemoryRoadmap",
       "createMemoryStore",
       "isElicitorError",
       "isIntakeUnavailable",

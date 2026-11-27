@@ -8,18 +8,21 @@ test("runtime exports of index.ts", async () => {
       "ElicitorActionError",
       "ElicitorProvider",
       "ElicitorTransportError",
+      "createFetchRoadmapTransport",
       "createFetchTransport",
       "isElicitorActionError",
       "isElicitorTransportError",
       "useCapture",
       "useElicitor",
       "useReport",
+      "useRoadmap",
     ]
   `);
 });
 test("runtime exports of testing.ts", async () => {
   expect(Object.keys(await import("./testing.ts")).sort()).toMatchInlineSnapshot(`
     [
+      "createMemoryRoadmapTransport",
       "createMemoryTransport",
     ]
   `);
