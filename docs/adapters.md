@@ -32,7 +32,7 @@ The contract:
   `"not_configured"` (no key or endpoint; ideally without making a request), `"gateway"` (network,
   HTTP or SDK error; pass the original as `cause`) or `"refusal"`. Any other error you throw is
   treated as `"gateway"`. `"invalid_output"` is core's own reason for text that does not decode.
-- Honour `signal` when it is given. `createIntake` does not pass one today; `runTurn` accepts it.
+- Honour `signal` when it is given.
 
 Whatever the reason, an unavailable turn never loses the report: core appends a system note in
 the reporter's language and moves it to `submitted`. `createIntake({ onUnavailable })` receives
@@ -95,7 +95,7 @@ adapter for the Vercel AI SDK is planned for 0.2.
 
 ### The fake model
 
-`createFakeModel()` from `@elicitor/core` needs no key and no network:
+`createFakeModel()` from `@elicitor/core/testing` needs no key and no network:
 
 - Without a script it is a scripted agent: one question ("What should be shown there instead?",
   or the Estonian, Finnish or Russian equivalent), then a summary built from the first sentence and
@@ -108,7 +108,8 @@ adapter for the Vercel AI SDK is planned for 0.2.
   empty, so a long-lived fake (a development server) holds no memory per call.
 
 ```ts
-import { createFakeModel, createIntake, createMemoryStore } from "@elicitor/core";
+import { createIntake, createMemoryStore } from "@elicitor/core";
+import { createFakeModel } from "@elicitor/core/testing";
 
 const model = createFakeModel([
   { kind: "question", text: "Which order?" },
@@ -132,8 +133,8 @@ const intake = createIntake({
 });
 ```
 
-`unavailableModel(reason?)` is a model that always throws `IntakeUnavailable`, for testing the
-fallback path or running with the assistant switched off.
+`unavailableModel(reason?)` from `@elicitor/core` is a model that always throws
+`IntakeUnavailable`, for testing the fallback path or running with the assistant switched off.
 
 ## ReportStore
 

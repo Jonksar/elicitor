@@ -1,5 +1,4 @@
 import {
-  createFakeModel,
   createIntake,
   createMemoryStore,
   type ElicitorTransport,
@@ -12,6 +11,7 @@ import {
   type ReportListItem,
   type SystemPromptOptions,
 } from "@elicitor/core";
+import { createFakeModel } from "@elicitor/core/testing";
 import { ElicitorTransportError } from "./errors.ts";
 
 export interface MemoryTransportOptions {

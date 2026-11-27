@@ -113,7 +113,8 @@ all messages including system notes, the summaries and the screenshot. Return
 
 Each summary has a `publicSummary` field: one or two English sentences meant for a public issue
 tracker. The system prompt tells the model it must contain no customer data (no amounts or other
-numbers, names, dates or document numbers; see `DEFAULT_PUBLIC_SUMMARY_RULES`, which
+numbers, names, dates or document numbers; see `DEFAULT_PUBLIC_SUMMARY_RULES` in
+`@elicitor/core/engine`, which
 `prompt.publicSummaryRules` replaces). It is still model output. Treat it as a draft that usually
 has no customer data, not as a guarantee: review it, or filter it, before it leaves your systems.
 

@@ -29,7 +29,6 @@ export { createFetchTransport, type FetchTransportOptions } from "./fetch-transp
 export {
   type CaptureApi,
   type CaptureStartOptions,
-  CONSOLE_ERROR_LIMIT,
   type CreateReportOptions,
   type ElicitorApi,
   type ElicitorCaptureConfig,

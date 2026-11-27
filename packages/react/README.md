@@ -41,7 +41,6 @@ From `@elicitor/react`:
 - Transport factory: `createFetchTransport`.
 - Errors: `ElicitorTransportError` and `isElicitorTransportError`, `ElicitorActionError` and
   `isElicitorActionError`.
-- Constant: `CONSOLE_ERROR_LIMIT` (`30`).
 - Types: `ElicitorProviderProps`, `ElicitorCaptureConfig`, `ElicitorApi`, `FlowState`, `FlowStep`,
   `OpenOptions`, `SubmitOptions`, `MessagesInput`, `CreateReportOptions`, `ReportsState`,
   `LoadStatus`, `ReportState`,
@@ -118,7 +117,7 @@ interface ElicitorCaptureConfig {
   finishes**, before the reporter writes the sentence, so they describe the screen that was marked.
   `createReport()` captures them when it is called.
 - `capture.consoleErrors` (default on): after mount the provider loads `@elicitor/capture` and
-  installs a console error buffer of `CONSOLE_ERROR_LIMIT` (30) entries. It uninstalls the buffer on
+  installs a console error buffer of 30 entries. It uninstalls the buffer on
   unmount, and also when the option is switched off. The buffer's entries go into
   `context.consoleErrors`. With the option off, no buffer is created and `consoleErrors` is `[]`.
   This is the one case where `@elicitor/capture` loads before the widget opens. With it off, the

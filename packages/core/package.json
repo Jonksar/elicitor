@@ -1,7 +1,7 @@
 {
   "name": "@elicitor/core",
   "version": "0.0.0",
-  "description": "Intake engine for in-app bug reports: prompt, output parser, fake model, memory store.",
+  "description": "Intake engine for in-app bug reports: the conversation, the store and model contracts, an in-memory store.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -10,6 +10,16 @@
       "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./testing": {
+      "source": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
+    "./engine": {
+      "source": "./src/engine.ts",
+      "types": "./dist/engine.d.ts",
+      "default": "./dist/engine.js"
     },
     "./package.json": "./package.json"
   },
@@ -34,6 +44,14 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "./engine": {
+        "types": "./dist/engine.d.ts",
+        "default": "./dist/engine.js"
       },
       "./package.json": "./package.json"
     }
