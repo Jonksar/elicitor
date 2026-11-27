@@ -24,5 +24,10 @@ export {
 } from "./memory-store.ts";
 export { buildSystemPrompt, type SystemPromptOptions } from "./prompt.ts";
 export { DEFAULT_LANGUAGES } from "./request.ts";
+export {
+  createMemoryRoadmap,
+  type MemoryRoadmap,
+  type MemoryRoadmapOptions,
+} from "./roadmap.ts";
 export { MAX_QUESTIONS } from "./turn.ts";
 export type * from "./types.ts";
