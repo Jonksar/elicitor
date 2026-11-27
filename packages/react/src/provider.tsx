@@ -485,17 +485,8 @@ export const useElicitorInternal = (hook: string): Internal => {
   return value;
 };
 
-/** Returns null outside <ElicitorProvider> when the provider is optional. */
-export function useElicitor(options: { readonly optional: true }): ElicitorApi | null;
 /** The imperative API for custom UIs. Throws outside <ElicitorProvider>. */
-export function useElicitor(): ElicitorApi;
-export function useElicitor(options: { readonly optional?: true } = {}): ElicitorApi | null {
-  const value = useContext(ElicitorContext);
-  if (!value && !options?.optional) {
-    throw new Error("useElicitor() must be used inside <ElicitorProvider>");
-  }
-  return value?.api ?? null;
-}
+export const useElicitor = (): ElicitorApi => useElicitorInternal("useElicitor").api;
 
 /** Region selection with the provider's capture switches. Throws outside <ElicitorProvider>. */
 export const useCapture = (): CaptureApi => useElicitorInternal("useCapture").capture;

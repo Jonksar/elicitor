@@ -38,10 +38,6 @@ Three entry points. Most hosts need only the first.
   server needs. For development, demos and tests; reports are lost on restart.
   `pendingSummaryOf(messages, status)` gives the pending summary and its seq when you build a
   `ReportDetail` over your own store.
-- `createMemoryRoadmap(items, options?)`: an in-memory roadmap with `list(userId)`,
-  `vote(userId, id, voted)` and `set(items)`. `MemoryRoadmapOptions.userId` assigns initial
-  `viewerVoted` flags to that user. Types include `MemoryRoadmap`, `MemoryRoadmapOptions`,
-  `RoadmapStage`, `RoadmapItem` and `RoadmapTransport`. See [Roadmap](../../docs/roadmap.md).
 - `unavailableModel(reason?)`: a model that always throws `IntakeUnavailable`, for running with
   the assistant switched off: every report is saved as written.
 - Defaults to extend: `DEFAULT_LANGUAGES`, `DEFAULT_UNAVAILABLE_NOTES`, `MAX_QUESTIONS` (4).
@@ -73,4 +69,3 @@ Authorisation is the host's concern: core acts on any report id it is given.
 - [Quick start](../../docs/quick-start.md)
 - [Adapters: ModelAdapter, ReportStore, transports](../../docs/adapters.md)
 - [Privacy](../../docs/privacy.md) and [security notes](../../docs/security.md)
-- [Roadmap](../../docs/roadmap.md)
