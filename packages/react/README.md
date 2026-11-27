@@ -57,7 +57,7 @@ From `@elicitor/react/testing`: `createMemoryTransport`, and the types `MemoryTr
 
 ## Error contract
 
-These rules hold for every hook:
+These rules hold for `useElicitor`, `useReport` and `useCapture`:
 
 - **Loads never reject.** That covers `reports.refresh()` and `useReport().refresh()`, including
   the automatic load when the id changes. A failure is stored in `status: "error"` and `error`.
