@@ -63,23 +63,6 @@ describe("createMemoryRoadmap", () => {
     expect(roadmap.list("alice")).toEqual([shipped]);
   });
 
-  test("replaces seed data while preserving votes only for retained IDs", async () => {
-    const roadmap = createMemoryRoadmap([item]);
-    await roadmap.vote("alice", item.id, true);
-    roadmap.set([
-      { ...item, title: "Export everything", votes: 10, viewerVoted: true },
-      { ...item, id: "search", votes: 0, viewerVoted: true },
-    ]);
-    expect(roadmap.list("alice")).toEqual([
-      { ...item, title: "Export everything", votes: 11, viewerVoted: true },
-      { ...item, id: "search", votes: 0 },
-    ]);
-    roadmap.set([]);
-    expect(roadmap.list("alice")).toEqual([]);
-    roadmap.set([item]);
-    expect(roadmap.list("alice")).toEqual([item]);
-  });
-
   test("returns copies and keeps copies of supplied items", async () => {
     const source = { ...item };
     const roadmap = createMemoryRoadmap([source]);
@@ -89,10 +72,5 @@ describe("createMemoryRoadmap", () => {
     const voted = (await roadmap.vote("alice", item.id, true)) as { title: string };
     voted.title = "Changed vote result";
     expect(roadmap.list("alice")).toEqual([{ ...item, votes: 4, viewerVoted: true }]);
-    roadmap.set([source]);
-    source.title = "Changed after set";
-    expect(roadmap.list("alice")).toEqual([
-      { ...item, title: "Changed outside", votes: 4, viewerVoted: true },
-    ]);
   });
 });

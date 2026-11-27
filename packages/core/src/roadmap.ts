@@ -9,8 +9,6 @@ export interface MemoryRoadmapOptions {
 export interface MemoryRoadmap {
   list(userId: string): ReadonlyArray<RoadmapItem>;
   vote(userId: string, id: string, voted: boolean): Promise<RoadmapItem>;
-  /** Replaces baseline counts and content, retaining tracked votes for remaining IDs. Flags are ignored. */
-  set(items: ReadonlyArray<RoadmapItem>): void;
 }
 
 interface Row {
@@ -23,7 +21,7 @@ export const createMemoryRoadmap = (
   items: ReadonlyArray<RoadmapItem>,
   options: MemoryRoadmapOptions = {},
 ): MemoryRoadmap => {
-  let rows = new Map<string, Row>(
+  const rows = new Map<string, Row>(
     items.map((item) => {
       const seeded = options.userId !== undefined && item.viewerVoted;
       return [
@@ -54,14 +52,6 @@ export const createMemoryRoadmap = (
       if (voted) row.voters.add(userId);
       else row.voters.delete(userId);
       return snapshot(row, userId);
-    },
-    set(items) {
-      rows = new Map(
-        items.map((item) => [
-          item.id,
-          { item: { ...item }, voters: rows.get(item.id)?.voters ?? new Set<string>() },
-        ]),
-      );
     },
   };
 };
